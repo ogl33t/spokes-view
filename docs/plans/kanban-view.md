@@ -1,8 +1,8 @@
 ---
-status: In progress
+status: Done
 spoke: SPOKE-115
 started: 2026-11-19
-finished:
+finished: 2026-11-19
 summary: Right-click "View Kanban" opens a new tab with a status-column board of a spoke's descendants, cards open a details modal.
 ---
 
@@ -68,3 +68,5 @@ than through `plan-executor`: the steps were small and tightly coupled.
   right-click SPOKE-5 → View Kanban opened `/?server=Home&kanban=5` in a new tab, the
   board drew 9 cards, a card opened the modal with notes and events, Escape closed it,
   and the 390 px phone layout stacks the columns.
+
+Merged to main as f84c7e9 (fast-forward, PR ogl33t/spokes-view#1), version 0.2.0.
