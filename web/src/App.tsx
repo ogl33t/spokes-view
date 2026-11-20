@@ -13,6 +13,7 @@ import { ContextMenu } from "./ContextMenu";
 import { DetailPanel, type DetailState } from "./DetailPanel";
 import { clock, spokeId } from "./format";
 import { Graph } from "./Graph";
+import { backlogUrl } from "./backlog";
 import { kanbanUrl } from "./kanban";
 import { layoutRadial } from "./layout";
 import { Legend } from "./Legend";
@@ -424,12 +425,6 @@ export function App(): ReactElement {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const openKanban = useCallback(
-    (id: number) => {
-      if (server) window.open(kanbanUrl(server, id), "_blank", "noopener");
-    },
-    [server],
-  );
   const closeMenu = useCallback(() => setMenu(null), []);
   const menuNode = menu ? store.nodes.get(menu.id) : undefined;
 
@@ -541,6 +536,11 @@ export function App(): ReactElement {
         >
           Collapse all
         </button>
+        {server && (
+          <a className="btn" href={backlogUrl(server, ROOT_ID)}>
+            Backlog
+          </a>
+        )}
         <span className="updated" aria-live="polite">
           {changedAt && `Updated ${clock(changedAt)}`}
           {checkedAt && changedAt && checkedAt.getTime() !== changedAt.getTime()
@@ -575,7 +575,7 @@ export function App(): ReactElement {
           }}
           onSelect={select}
           onToggle={(id) => void toggle(id)}
-          onKanban={openKanban}
+          server={server}
         />
       )}
       {menu && menuNode && (
@@ -585,8 +585,11 @@ export function App(): ReactElement {
           heading={`${spokeId(menuNode.id)} ${menuNode.title}`}
           onClose={closeMenu}
           items={[
-            ...(menuNode.child_count > 0
-              ? [{ label: "View Kanban ↗", onPick: () => openKanban(menuNode.id) }]
+            ...(menuNode.child_count > 0 && server
+              ? [
+                  { label: "View Backlog", href: backlogUrl(server, menuNode.id) },
+                  { label: "View Kanban", href: kanbanUrl(server, menuNode.id) },
+                ]
               : []),
             { label: "Show details", onPick: () => select(menuNode.id) },
             ...(menuNode.child_count > 0

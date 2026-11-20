@@ -1,7 +1,7 @@
 ---
-status: Planned
+status: In progress
 spoke: SPOKE-138
-started:
+started: 2026-11-19
 finished:
 summary: Backlog page (indented, filterable list of a spoke's descendants) from the right-click menu; Kanban and Backlog become plain same-tab links.
 ---
@@ -74,3 +74,28 @@ All in `web/src/`, done in order in one branch `feat/backlog-view` (small, tight
 
 - A whole-tree backlog is one slice of 10 levels; past the Spokes node cap it is truncated
   and says so.
+
+## What shipped
+
+All six steps on `feat/backlog-view`, implemented in the main session rather than through
+`plan-executor` (small, tightly coupled steps, as with the kanban view).
+
+- `backlog.ts` (+7 tests): `backlogUrl`, `backlogRootFrom`, `buildOutline`, `matches`,
+  `visibleRows`. `kanban.ts` gained `compareNodes`, which the outline reuses for sibling order.
+- `useSubtree.ts`: the slice loading, ETag refresh and detail loading moved out of
+  `KanbanApp`, now shared by both pages.
+- `BacklogApp.tsx`: header links home and to Kanban, filter box, Show closed,
+  Expand all / Collapse all, Refresh; rows with twisty, status, title, id, area, priority,
+  due, progress, markers; a row opens `NodeModal`.
+- `ViewLinks.tsx`: the View Backlog / View Kanban links, used by the side panel and both
+  modals. `ContextMenu` items can be links (`href`); the graph menu offers View Backlog and
+  View Kanban as `<a>`; the graph header has a Backlog link (root `SPOKE-1`). No
+  `window.open`, no `target="_blank"`.
+- README Backlog/Kanban wording; version 0.3.0.
+- Verified: ESLint, Prettier, `tsc`, Vitest (34 tests), Vite build, `cargo test --locked`,
+  `cargo clippy`, and headless Chromium against the LAN Spokes 0.3.0 server: right-click
+  SPOKE-5 shows View Backlog / View Kanban as links, View Backlog navigated in the same tab
+  to `/?server=Home&backlog=5` (16 rows), collapse hid 2 rows, filter "kanban" kept the
+  match plus its ancestors, a row opened the modal with both links, the header Kanban link
+  navigated in the same tab, Back returned through backlog to the graph, the whole-tree
+  backlog drew 112 rows, and the 390 px phone layout has no horizontal scroll.

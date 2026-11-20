@@ -1,9 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 
-export interface MenuItem {
-  label: string;
-  onPick: () => void;
-}
+/** An action run on pick, or a link to another page (so it can open in a new tab too). */
+export type MenuItem = { label: string; onPick: () => void } | { label: string; href: string };
 
 interface Props {
   /** Where the menu opens, in viewport pixels. */
@@ -29,7 +27,7 @@ export function ContextMenu({ x, y, heading, items, onClose }: Props): ReactElem
     const nx = Math.max(4, Math.min(x, window.innerWidth - r.width - 4));
     const ny = Math.max(4, Math.min(y, window.innerHeight - r.height - 4));
     setPos({ x: nx, y: ny });
-    el.querySelector("button")?.focus();
+    el.querySelector<HTMLElement>("[role=menuitem]")?.focus();
   }, [x, y]);
 
   useEffect(() => {
@@ -40,8 +38,8 @@ export function ContextMenu({ x, y, heading, items, onClose }: Props): ReactElem
         onClose();
       } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
-        const buttons = [...(ref.current?.querySelectorAll("button") ?? [])];
-        const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const buttons = [...(ref.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
+        const i = buttons.indexOf(document.activeElement as HTMLElement);
         const step = e.key === "ArrowDown" ? 1 : -1;
         buttons[(i + step + buttons.length) % buttons.length]?.focus();
       }
@@ -73,19 +71,25 @@ export function ContextMenu({ x, y, heading, items, onClose }: Props): ReactElem
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="menu-head">{heading}</div>
-      {items.map((item) => (
-        <button
-          key={item.label}
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onClose();
-            item.onPick();
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
+      {items.map((item) =>
+        "href" in item ? (
+          <a key={item.label} role="menuitem" href={item.href} onClick={onClose}>
+            {item.label}
+          </a>
+        ) : (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onClose();
+              item.onPick();
+            }}
+          >
+            {item.label}
+          </button>
+        ),
+      )}
     </div>
   );
 }

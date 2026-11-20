@@ -1,27 +1,10 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactElement,
-  type ReactNode,
-} from "react";
-import { ApiError, fetchNode, fetchTree, type TreeQuery } from "./api";
-import type { DetailState } from "./DetailPanel";
+import { useEffect, useMemo, type ReactElement, type ReactNode } from "react";
+import { backlogUrl } from "./backlog";
 import { clock, markers, spokeId, STATUS_LABEL } from "./format";
-import { buildBoard, kanbanUrl, type Card } from "./kanban";
+import { buildBoard, type Card } from "./kanban";
 import { NodeModal } from "./NodeModal";
-import type { TreeResponse } from "./types";
-
-/** The API's deepest slice: the board shows this many levels beneath its root. */
-const BOARD_DEPTH = 10;
-const REFRESH_MS = 30_000;
-
-function errorOf(e: unknown): ApiError {
-  return e instanceof ApiError ? e : new ApiError("upstream_error", 0, String(e));
-}
+import { useSubtree } from "./useSubtree";
+import { ViewLinks } from "./ViewLinks";
 
 interface Props {
   server: string | null;
@@ -30,113 +13,21 @@ interface Props {
 
 /** A kanban board of every node beneath `rootId`, one column per status. */
 export function KanbanApp({ server, rootId }: Props): ReactElement {
-  const [includeClosed, setIncludeClosed] = useState(false);
-  const [slice, setSlice] = useState<{ etag: string | null; data: TreeResponse } | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [checkedAt, setCheckedAt] = useState<Date | null>(null);
-  const [detail, setDetail] = useState<DetailState | null>(null);
+  const {
+    includeClosed,
+    toggleClosed,
+    data,
+    error,
+    refreshError,
+    refreshing,
+    checkedAt,
+    refresh,
+    detail,
+    openDetail: open,
+    closeDetail,
+  } = useSubtree(server, rootId);
 
-  const sliceRef = useRef(slice);
-  const detailRef = useRef(detail);
-  useLayoutEffect(() => {
-    sliceRef.current = slice;
-    detailRef.current = detail;
-  }, [slice, detail]);
-  /** Bumped when the closed toggle changes; stale responses are dropped. */
-  const generation = useRef(0);
-
-  const query = useCallback(
-    (closed: boolean): TreeQuery => ({ root: rootId, depth: BOARD_DEPTH, includeClosed: closed }),
-    [rootId],
-  );
-
-  // First load, and again when the closed toggle changes.
-  useEffect(() => {
-    if (!server) return;
-    const gen = ++generation.current;
-    const ctl = new AbortController();
-    fetchTree(server, query(includeClosed), null, ctl.signal)
-      .then((r) => {
-        if (gen !== generation.current || !r.data) return;
-        setError(null);
-        setSlice({ etag: r.etag, data: r.data });
-        setCheckedAt(new Date());
-      })
-      .catch((e: unknown) => {
-        if (e instanceof DOMException && e.name === "AbortError") return;
-        if (gen === generation.current) setError(errorOf(e));
-      });
-    return () => ctl.abort();
-  }, [server, includeClosed, query]);
-
-  const loadDetail = useCallback(
-    async (id: number, etag: string | null) => {
-      if (!server) return;
-      try {
-        const r = await fetchNode(server, id, includeClosed, etag);
-        if (detailRef.current?.id !== id) return;
-        if (r.data) setDetail({ id, data: r.data, etag: r.etag, error: null, loading: false });
-      } catch (e) {
-        if (detailRef.current?.id !== id) return;
-        const err = errorOf(e);
-        setDetail((d) =>
-          d && d.id === id
-            ? {
-                ...d,
-                loading: false,
-                error:
-                  err.code === "not_found" ? "This node is no longer in the tree." : err.message,
-              }
-            : d,
-        );
-      }
-    },
-    [server, includeClosed],
-  );
-
-  const open = useCallback(
-    (id: number) => {
-      setDetail({ id, data: null, etag: null, error: null, loading: true });
-      void loadDetail(id, null);
-    },
-    [loadDetail],
-  );
-
-  // Refresh with the slice's tag: an unchanged board costs a 304.
-  const refresh = useCallback(async () => {
-    const cur = sliceRef.current;
-    if (!server || !cur || refreshing) return;
-    const gen = generation.current;
-    setRefreshing(true);
-    try {
-      const r = await fetchTree(server, query(includeClosed), cur.etag);
-      if (gen !== generation.current) return;
-      if (r.data) setSlice({ etag: r.etag, data: r.data });
-      setRefreshError(null);
-      const d = detailRef.current;
-      if (d) void loadDetail(d.id, d.etag);
-    } catch (e) {
-      if (gen === generation.current) setRefreshError(`Refresh failed: ${errorOf(e).message}`);
-    } finally {
-      setCheckedAt(new Date());
-      setRefreshing(false);
-    }
-  }, [server, refreshing, query, includeClosed, loadDetail]);
-
-  useEffect(() => {
-    const t = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refresh();
-    }, REFRESH_MS);
-    return () => window.clearInterval(t);
-  }, [refresh]);
-
-  const board = useMemo(
-    () => (slice ? buildBoard(slice.data, includeClosed) : []),
-    [slice, includeClosed],
-  );
-  const data = slice?.data;
+  const board = useMemo(() => (data ? buildBoard(data, includeClosed) : []), [data, includeClosed]);
   const rootNode = data?.nodes.find((n) => n.id === rootId);
   const nodesById = useMemo(() => new Map(data?.nodes.map((n) => [n.id, n])), [data]);
   const total = board.reduce((sum, c) => sum + c.cards.length, 0);
@@ -205,12 +96,13 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
           </span>
         </h1>
         {server && <span className="chip">{server}</span>}
+        {server && (
+          <a className="btn" href={backlogUrl(server, rootId)}>
+            Backlog
+          </a>
+        )}
         <label className="check">
-          <input
-            type="checkbox"
-            checked={includeClosed}
-            onChange={() => setIncludeClosed((c) => !c)}
-          />
+          <input type="checkbox" checked={includeClosed} onChange={toggleClosed} />
           Show closed
         </label>
         <button
@@ -239,22 +131,9 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
           fromTree={nodesById.get(detail.id)}
           timeZone={data?.time_zone ?? "UTC"}
           today={today}
-          onClose={() => setDetail(null)}
+          onClose={closeDetail}
           onSelect={open}
-          actions={(n) =>
-            n.child_count > 0 && (
-              <p className="actions">
-                <a
-                  className="btn"
-                  href={kanbanUrl(server, n.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  View Kanban ↗
-                </a>
-              </p>
-            )
-          }
+          actions={(n) => <ViewLinks server={server} node={n} />}
         />
       )}
     </div>

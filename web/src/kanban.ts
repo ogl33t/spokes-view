@@ -46,8 +46,11 @@ function nullsLast(a: number | string | null, b: number | string | null): number
 
 /** Most pressing first: priority, focus rank, due date, then oldest id. */
 export function compareCards(a: Card, b: Card): number {
-  const x = a.node;
-  const y = b.node;
+  return compareNodes(a.node, b.node);
+}
+
+/** Most pressing first: priority, focus rank, due date, then oldest id. */
+export function compareNodes(x: ViewNode, y: ViewNode): number {
   return (
     nullsLast(x.effective_priority, y.effective_priority) ||
     nullsLast(x.focus, y.focus) ||

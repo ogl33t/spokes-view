@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { dueState, formatDate, formatInstant, markers, spokeId, STATUS_LABEL } from "./format";
 import type { NodeResponse, ViewNode } from "./types";
+import { ViewLinks } from "./ViewLinks";
 
 /** Event details carry UTC instants (e.g. a lease end); show them in the server's zone. */
 export function localizeTimes(text: string, timeZone: string): string {
@@ -32,7 +33,8 @@ interface DetailsProps {
 interface PanelProps extends Omit<DetailsProps, "actions"> {
   expanded: boolean;
   onToggle: (id: number) => void;
-  onKanban: (id: number) => void;
+  /** The server shown, for the links to a node's backlog and kanban pages. */
+  server: string;
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }): ReactElement {
@@ -46,23 +48,20 @@ function Row({ label, children }: { label: string; children: ReactNode }): React
 
 /** The side panel beside the graph. */
 export function DetailPanel(props: PanelProps): ReactElement {
-  const { expanded, onToggle, onKanban, ...rest } = props;
+  const { expanded, onToggle, server, ...rest } = props;
   return (
     <aside className="panel details" aria-label="Node details">
       <NodeDetails
         {...rest}
-        actions={(n) =>
-          n.child_count > 0 && (
-            <p className="actions">
+        actions={(n) => (
+          <ViewLinks server={server} node={n}>
+            {n.child_count > 0 && (
               <button type="button" className="btn" onClick={() => onToggle(n.id)}>
                 {expanded ? "Collapse branch" : `Expand branch (${n.descendant_count} beneath)`}
               </button>
-              <button type="button" className="btn" onClick={() => onKanban(n.id)}>
-                View Kanban ↗
-              </button>
-            </p>
-          )
-        }
+            )}
+          </ViewLinks>
+        )}
       />
     </aside>
   );
