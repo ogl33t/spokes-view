@@ -1,8 +1,8 @@
 ---
-status: In progress
+status: Done
 spoke: SPOKE-178
 started: 2026-11-20
-finished:
+finished: 2026-11-20
 summary: Clicking a node in the radial tree rotates the tree so its label reads horizontally, pans it to the viewport centre and zooms in, as one short animation.
 ---
 
@@ -91,3 +91,4 @@ rather than through `plan-executor`.
   0.2 px from the graph centre with labels 274×16 and 266×15 px on screen, zoom 0.37 →
   1 → 1.6, 0 of 77 labels pointing left, Fit back to `rotate(0)`, no page errors.
 - Version 0.4.0.
+- Merged 367111c (fast-forward), tagged v0.4.0; image `ghcr.io/ogl33t/spokes-view:sha-367111c`; stacks pinned in 48bd36a (ogl33t/stacks#6).
