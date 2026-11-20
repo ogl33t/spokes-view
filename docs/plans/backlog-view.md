@@ -1,8 +1,8 @@
 ---
-status: In progress
+status: Done
 spoke: SPOKE-138
 started: 2026-11-19
-finished:
+finished: 2026-11-19
 summary: Backlog page (indented, filterable list of a spoke's descendants) from the right-click menu; Kanban and Backlog become plain same-tab links.
 ---
 
@@ -99,3 +99,5 @@ All six steps on `feat/backlog-view`, implemented in the main session rather tha
   match plus its ancestors, a row opened the modal with both links, the header Kanban link
   navigated in the same tab, Back returned through backlog to the graph, the whole-tree
   backlog drew 112 rows, and the 390 px phone layout has no horizontal scroll.
+
+Merged to main as db9198e (fast-forward, PR ogl33t/spokes-view#2), tagged v0.3.0; image `ghcr.io/ogl33t/spokes-view:sha-db9198e` pinned in ogl33t/stacks `kdev3/spokes` (f7be676, PR ogl33t/stacks#5), deployed by Git Sync. Merge, tag and stacks pin were authorized by Brandon after the PR opened.
