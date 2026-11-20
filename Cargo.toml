@@ -1,6 +1,6 @@
 [package]
 name = "spokes-view"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.88"
 description = "spokes-view: a read-only radial web view of a Spokes to-do tree"

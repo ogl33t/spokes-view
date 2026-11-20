@@ -1,7 +1,7 @@
 ---
-status: Planned
+status: In progress
 spoke: SPOKE-178
-started:
+started: 2026-11-20
 finished:
 summary: Clicking a node in the radial tree rotates the tree so its label reads horizontally, pans it to the viewport centre and zooms in, as one short animation.
 ---
@@ -73,3 +73,21 @@ their layout angle, and inner (level) labels are counter-rotated to stay horizon
 
 - A click that starts a double-click (expand) also starts a focus; the toggle still works.
 - Large trees: the animation uses the composited fast path, so cost per frame is flat.
+
+## What shipped
+
+Steps 1–4 on `feat/click-to-focus`, done in the main session (small and tightly coupled)
+rather than through `plan-executor`.
+
+- `web/src/focus.ts` (+16 tests): `focusTarget`, `screenOf`, `interpolateView`,
+  `easeInOut`, `labelFlip`.
+- `web/src/Graph.tsx`: rotation in the view, the fast path generalised to rotation,
+  `focusOn` on click, `stopFocus` on drag/wheel/pinch/zoom buttons/fit, Fit resets to
+  north-up, labels flip by on-screen direction and inner labels are counter-rotated.
+- **Deviation:** the focus target is recomputed every frame, not once. The first click
+  opens the detail panel, which narrows the graph after the click; a target fixed at
+  click time left the node 210 px right of centre (caught in the headless run).
+- Verified headless against the LAN Spokes: two clicks on diagonal labels ended 0.1 and
+  0.2 px from the graph centre with labels 274×16 and 266×15 px on screen, zoom 0.37 →
+  1 → 1.6, 0 of 77 labels pointing left, Fit back to `rotate(0)`, no page errors.
+- Version 0.4.0.
