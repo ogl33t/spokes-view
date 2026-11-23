@@ -1,8 +1,8 @@
 ---
-status: In progress
+status: Done
 spoke: SPOKE-209
 started: 2026-11-23
-finished:
+finished: 2026-11-23
 summary: Give each Spokes type an inline SVG icon and each stage its own colour across spokes-view's chips, Kanban stage columns and Legend.
 ---
 
@@ -221,6 +221,8 @@ All four steps landed on `feat/type-icons-stage-colours` (v0.6.0).
 **Tested how:**
 - In this session, all of these passed: `npm run lint`, `format:check`, `typecheck`, `npm test` (76 tests), `npm run build`, `cargo fmt --check`, `cargo clippy --locked --all-targets -D warnings` and `cargo test --locked`.
 - End to end, the debug binary ran against the LAN Spokes (`kdev3:10050`) and was screenshotted with headless Chromium in dark and light. The shots cover the SPOKE-109 Backlog (Show closed), Kanban `&group=stage` with Show closed (all 8 columns: coloured dots on the stage columns, none on No stage), the SPOKE-209 details modal, and the open Legend.
+
+**Review and merge:** Brandon approved PR #5 after the screenshot checks. "Close others" leaves the picked node as it was: collapsed if it was collapsed. That question was left open and the behaviour kept.
 
 **Untested:** no live node has type `bug`, `chore` or `idea`, so those chips were seen only as Legend entries and in the icon preview, not on real rows. (`in_review` was seen live once SPOKE-209 moved to it.)
 
