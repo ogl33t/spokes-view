@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildBoard, columnsFor, kanbanRootFrom, kanbanUrl } from "./kanban";
+import { STAGES } from "./format";
+import { buildBoard, columnsFor, groupingFrom, kanbanRootFrom, kanbanUrl } from "./kanban";
 import type { TreeResponse, ViewNode } from "./types";
 
 function node(id: number, parent: number | null, over: Partial<ViewNode> = {}): ViewNode {
@@ -67,6 +68,17 @@ describe("kanban urls", () => {
     expect(kanbanRootFrom("?kanban=0")).toBeNull();
     expect(kanbanRootFrom("?server=x")).toBeNull();
   });
+
+  it("round-trips the grouping", () => {
+    expect(kanbanUrl("s", 4)).toBe("/?server=s&kanban=4");
+    expect(kanbanUrl("s", 4, "status")).toBe("/?server=s&kanban=4");
+    const url = kanbanUrl("s", 4, "stage");
+    expect(url).toBe("/?server=s&kanban=4&group=stage");
+    expect(groupingFrom(url.slice(1))).toBe("stage");
+    expect(kanbanRootFrom(url.slice(1))).toBe(4);
+    expect(groupingFrom("?kanban=4")).toBe("status");
+    expect(groupingFrom("?group=other")).toBe("status");
+  });
 });
 
 describe("buildBoard", () => {
@@ -82,8 +94,8 @@ describe("buildBoard", () => {
 
   it("puts every descendant, not the root or its ancestors, in its status column", () => {
     const cols = buildBoard(tree, true);
-    expect(cols.map((c) => c.status)).toEqual(columnsFor(true));
-    const ids = (s: string) => cols.find((c) => c.status === s)?.cards.map((c) => c.node.id) ?? [];
+    expect(cols.map((c) => c.key)).toEqual(columnsFor(true));
+    const ids = (s: string) => cols.find((c) => c.key === s)?.cards.map((c) => c.node.id) ?? [];
     expect(ids("open")).toEqual([12]);
     expect(ids("in_progress")).toEqual([11]);
     expect(ids("waiting")).toEqual([13]);
@@ -100,11 +112,7 @@ describe("buildBoard", () => {
   });
 
   it("leaves out the closed columns unless asked", () => {
-    expect(buildBoard(tree, false).map((c) => c.status)).toEqual([
-      "open",
-      "in_progress",
-      "waiting",
-    ]);
+    expect(buildBoard(tree, false).map((c) => c.key)).toEqual(["open", "in_progress", "waiting"]);
   });
 
   it("orders cards by priority, focus, due, then id", () => {
@@ -121,5 +129,32 @@ describe("buildBoard", () => {
       false,
     );
     expect(cols[0]?.cards.map((c) => c.node.id)).toEqual([7, 6, 5, 4, 3, 2]);
+  });
+});
+
+describe("buildBoard by stage", () => {
+  const tree = slice(1, [
+    node(1, null),
+    node(2, 1, { stage: "idea" }),
+    node(3, 1, { stage: "planned" }),
+    node(4, 1, { stage: "done", status: "done" }),
+    node(5, 1),
+    node(6, 1, { stage: "bogus" as never }),
+  ]);
+
+  it("has a column per stage in order, then No stage", () => {
+    const cols = buildBoard(tree, false, "stage");
+    expect(cols.map((c) => c.key)).toEqual([...STAGES, "none"]);
+    expect(cols).toHaveLength(9);
+    expect(cols[cols.length - 1]?.label).toBe("No stage");
+  });
+
+  it("puts each node in its stage column and the rest in No stage", () => {
+    const cols = buildBoard(tree, false, "stage");
+    const ids = (k: string) => cols.find((c) => c.key === k)?.cards.map((c) => c.node.id) ?? [];
+    expect(ids("idea")).toEqual([2]);
+    expect(ids("planned")).toEqual([3]);
+    expect(ids("done")).toEqual([4]);
+    expect(ids("none")).toEqual([5, 6]);
   });
 });

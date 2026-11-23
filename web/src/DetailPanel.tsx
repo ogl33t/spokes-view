@@ -1,5 +1,16 @@
 import type { ReactElement, ReactNode } from "react";
-import { dueState, formatDate, formatInstant, markers, spokeId, STATUS_LABEL } from "./format";
+import {
+  dueState,
+  formatDate,
+  formatInstant,
+  markers,
+  spokeId,
+  STAGE_LABEL,
+  stageOf,
+  STATUS_LABEL,
+  TYPE_LABEL,
+  typeOf,
+} from "./format";
 import type { NodeResponse, ViewNode } from "./types";
 import { ViewLinks } from "./ViewLinks";
 
@@ -77,6 +88,8 @@ export function NodeDetails(props: DetailsProps): ReactElement {
   const day = detail.data?.today ?? today;
   const at = (iso: string) => formatInstant(iso, tz);
   const due = n ? dueState(n, day) : null;
+  const type = n ? typeOf(n) : null;
+  const stage = n ? stageOf(n) : null;
 
   return (
     <>
@@ -122,6 +135,16 @@ export function NodeDetails(props: DetailsProps): ReactElement {
             </div>
           )}
           <dl className="fields">
+            {type !== null && (
+              <Row label="Type">
+                <span className={`chip type-chip t-${type}`}>{TYPE_LABEL[type]}</span>
+              </Row>
+            )}
+            {stage !== null && (
+              <Row label="Stage">
+                <span className="chip stage-chip">{STAGE_LABEL[stage]}</span>
+              </Row>
+            )}
             {n.effective_priority !== null && (
               <Row label="Priority">
                 {n.priority !== null

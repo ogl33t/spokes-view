@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { backlogRootFrom, backlogUrl, buildOutline, matches, visibleRows } from "./backlog";
+import {
+  backlogRootFrom,
+  backlogUrl,
+  buildOutline,
+  matches,
+  NO_FILTER,
+  visibleRows,
+  type RowFilter,
+} from "./backlog";
 import type { TreeResponse, ViewNode } from "./types";
 
 function node(id: number, parent: number | null, over: Partial<ViewNode> = {}): ViewNode {
@@ -37,6 +45,8 @@ function node(id: number, parent: number | null, over: Partial<ViewNode> = {}): 
     ...over,
   };
 }
+
+const text = (t: string): RowFilter => ({ ...NO_FILTER, text: t });
 
 function slice(root: number, nodes: ViewNode[]): TreeResponse {
   return {
@@ -115,19 +125,51 @@ describe("visibleRows", () => {
   );
 
   it("hides rows inside a collapsed branch", () => {
-    expect(visibleRows(rows, new Set([2]), "").map((r) => r.node.id)).toEqual([2, 4]);
+    expect(visibleRows(rows, new Set([2]), NO_FILTER).map((r) => r.node.id)).toEqual([2, 4]);
   });
 
   it("keeps matches and their ancestors, even when collapsed", () => {
-    expect(visibleRows(rows, new Set([2]), "backup").map((r) => r.node.id)).toEqual([2, 3]);
-    expect(visibleRows(rows, new Set(), "SPOKE-4").map((r) => r.node.id)).toEqual([4]);
+    expect(visibleRows(rows, new Set([2]), text("backup")).map((r) => r.node.id)).toEqual([2, 3]);
+    expect(visibleRows(rows, new Set(), text("SPOKE-4")).map((r) => r.node.id)).toEqual([4]);
   });
 
   it("matches ids exactly and titles by substring", () => {
     const n = node(2, 1, { title: "Server" });
-    expect(matches(n, "2")).toBe(true);
-    expect(matches(n, "spoke-2")).toBe(true);
-    expect(matches(n, "serv")).toBe(true);
-    expect(matches(n, "22")).toBe(false);
+    expect(matches(n, text("2"))).toBe(true);
+    expect(matches(n, text("spoke-2"))).toBe(true);
+    expect(matches(n, text("serv"))).toBe(true);
+    expect(matches(n, text("22"))).toBe(false);
+  });
+
+  describe("type and stage filters", () => {
+    const typed = buildOutline(
+      slice(1, [
+        node(1, null),
+        node(2, 1, { title: "Epic", type: "epic", stage: "in_progress" }),
+        node(3, 2, { title: "Feat", type: "feature", stage: "planned" }),
+        node(4, 2, { title: "Plain" }),
+        node(5, 1, { title: "Bug", type: "bug" }),
+      ]),
+    );
+    const ids = (f: RowFilter) => visibleRows(typed, new Set(), f).map((r) => r.node.id);
+
+    it("filters by type only, keeping ancestors", () => {
+      expect(ids({ ...NO_FILTER, type: "feature" })).toEqual([2, 3]);
+    });
+
+    it("filters by stage only", () => {
+      expect(ids({ ...NO_FILTER, stage: "planned" })).toEqual([2, 3]);
+      expect(ids({ ...NO_FILTER, stage: "in_progress" })).toEqual([2]);
+    });
+
+    it("none matches nodes without a value, judged on their own", () => {
+      expect(ids({ ...NO_FILTER, type: "none" })).toEqual([2, 4]);
+      expect(ids({ ...NO_FILTER, stage: "none" })).toEqual([2, 4, 5]);
+    });
+
+    it("combines text with type", () => {
+      expect(ids({ text: "feat", type: "feature", stage: "any" })).toEqual([2, 3]);
+      expect(ids({ text: "bug", type: "feature", stage: "any" })).toEqual([]);
+    });
   });
 });

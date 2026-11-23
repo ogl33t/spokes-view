@@ -1,5 +1,6 @@
+import { stageOf, typeOf } from "./format";
 import { compareNodes } from "./kanban";
-import type { TreeResponse, ViewNode } from "./types";
+import type { NodeType, Stage, TreeResponse, ViewNode } from "./types";
 
 /** URL parameter that turns the page into a backlog list of one node's descendants. */
 export const BACKLOG_PARAM = "backlog";
@@ -57,9 +58,34 @@ export function buildOutline(slice: TreeResponse): Row[] {
   return out;
 }
 
-/** True when `n` matches a filter: a title substring, or its id as `SPOKE-N` or `N`. */
-export function matches(n: ViewNode, filter: string): boolean {
-  const f = filter.trim().toLowerCase();
+/** What the backlog's filters ask for. "any" is no constraint; "none" wants nodes with no value. */
+export interface RowFilter {
+  text: string;
+  type: NodeType | "any" | "none";
+  stage: Stage | "any" | "none";
+}
+
+export const NO_FILTER: RowFilter = { text: "", type: "any", stage: "any" };
+
+/** True when any part of the filter narrows the list. */
+export function isFiltering(f: RowFilter): boolean {
+  return f.text.trim() !== "" || f.type !== "any" || f.stage !== "any";
+}
+
+function matchesValue<T extends string>(want: T | "any" | "none", have: T | null): boolean {
+  if (want === "any") return true;
+  if (want === "none") return have === null;
+  return have === want;
+}
+
+/**
+ * True when `n` passes every filter: a title substring or its id as `SPOKE-N` or `N`, plus its
+ * own type and stage (never inherited).
+ */
+export function matches(n: ViewNode, filter: RowFilter): boolean {
+  if (!matchesValue(filter.type, typeOf(n))) return false;
+  if (!matchesValue(filter.stage, stageOf(n))) return false;
+  const f = filter.text.trim().toLowerCase();
   if (f === "") return true;
   const id = /^(?:spoke-)?(\d+)$/.exec(f);
   if (id && Number(id[1]) === n.id) return true;
@@ -70,8 +96,8 @@ export function matches(n: ViewNode, filter: string): boolean {
  * The rows to draw. Rows inside a collapsed branch are hidden. With a filter, only matches
  * and their ancestors show, and collapsed branches open so no match is hidden.
  */
-export function visibleRows(rows: Row[], collapsed: ReadonlySet<number>, filter: string): Row[] {
-  if (filter.trim() === "") {
+export function visibleRows(rows: Row[], collapsed: ReadonlySet<number>, filter: RowFilter): Row[] {
+  if (!isFiltering(filter)) {
     return rows.filter((r) => !r.ancestors.some((a) => collapsed.has(a)));
   }
   const keep = new Set<number>();

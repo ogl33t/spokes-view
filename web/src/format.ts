@@ -1,4 +1,4 @@
-import type { Status, ViewNode } from "./types";
+import type { NodeType, Stage, Status, ViewNode } from "./types";
 
 export const STATUS_LABEL: Record<Status, string> = {
   open: "open",
@@ -7,6 +7,48 @@ export const STATUS_LABEL: Record<Status, string> = {
   done: "done",
   dropped: "dropped",
 };
+
+export const NODE_TYPES: readonly NodeType[] = ["bug", "feature", "chore", "idea", "epic"];
+
+export const STAGES: readonly Stage[] = [
+  "idea",
+  "backlog",
+  "brainstormed",
+  "understood",
+  "planned",
+  "in_progress",
+  "in_review",
+  "done",
+];
+
+export const TYPE_LABEL: Record<NodeType, string> = {
+  bug: "bug",
+  feature: "feature",
+  chore: "chore",
+  idea: "idea",
+  epic: "epic",
+};
+
+export const STAGE_LABEL: Record<Stage, string> = {
+  idea: "idea",
+  backlog: "backlog",
+  brainstormed: "brainstormed",
+  understood: "understood",
+  planned: "planned",
+  in_progress: "in progress",
+  in_review: "in review",
+  done: "done",
+};
+
+/** The node's type; `null` when missing (pre-0.4.0 server), unset or a value this app does not know. */
+export function typeOf(n: ViewNode): NodeType | null {
+  return NODE_TYPES.find((t) => t === n.type) ?? null;
+}
+
+/** The node's stage; `null` when missing, unset or unknown. */
+export function stageOf(n: ViewNode): Stage | null {
+  return STAGES.find((s) => s === n.stage) ?? null;
+}
 
 export function spokeId(id: number): string {
   return `SPOKE-${id}`;

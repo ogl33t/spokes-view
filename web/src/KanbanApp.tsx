@@ -1,8 +1,9 @@
-import { useEffect, useMemo, type ReactElement, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { backlogUrl } from "./backlog";
-import { clock, markers, spokeId, STATUS_LABEL } from "./format";
-import { buildBoard, type Card } from "./kanban";
+import { clock, markers, spokeId } from "./format";
+import { buildBoard, GROUP_PARAM, groupingFrom, type Card, type Grouping } from "./kanban";
 import { NodeModal } from "./NodeModal";
+import { TypeStageChips } from "./TypeStageChips";
 import { useSubtree } from "./useSubtree";
 import { ViewLinks } from "./ViewLinks";
 
@@ -11,7 +12,7 @@ interface Props {
   rootId: number;
 }
 
-/** A kanban board of every node beneath `rootId`, one column per status. */
+/** A kanban board of every node beneath `rootId`, one column per status or stage. */
 export function KanbanApp({ server, rootId }: Props): ReactElement {
   const {
     includeClosed,
@@ -27,7 +28,19 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
     closeDetail,
   } = useSubtree(server, rootId);
 
-  const board = useMemo(() => (data ? buildBoard(data, includeClosed) : []), [data, includeClosed]);
+  const [group, setGroup] = useState<Grouping>(() => groupingFrom(window.location.search));
+  const changeGroup = (next: Grouping): void => {
+    setGroup(next);
+    const url = new URL(window.location.href);
+    if (next === "stage") url.searchParams.set(GROUP_PARAM, "stage");
+    else url.searchParams.delete(GROUP_PARAM);
+    window.history.replaceState(window.history.state, "", url);
+  };
+
+  const board = useMemo(
+    () => (data ? buildBoard(data, includeClosed, group) : []),
+    [data, includeClosed, group],
+  );
   const rootNode = data?.nodes.find((n) => n.id === rootId);
   const nodesById = useMemo(() => new Map(data?.nodes.map((n) => [n.id, n])), [data]);
   const total = board.reduce((sum, c) => sum + c.cards.length, 0);
@@ -61,10 +74,12 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
     body = (
       <div className="board">
         {board.map((col) => (
-          <section key={col.status} className="column" aria-label={STATUS_LABEL[col.status]}>
+          <section key={col.key} className="column" aria-label={col.label}>
             <h2>
-              <span className={`status-dot s-${col.status}`} aria-hidden="true" />
-              {STATUS_LABEL[col.status]}
+              {group === "status" && (
+                <span className={`status-dot s-${col.key}`} aria-hidden="true" />
+              )}
+              {col.label}
               <span className="count">{col.cards.length}</span>
             </h2>
             <ol className="cards">
@@ -101,6 +116,16 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
             Backlog
           </a>
         )}
+        <label>
+          <span className="sr-only">Group by</span>
+          <select
+            value={group}
+            onChange={(e) => changeGroup(groupingFrom(`?group=${e.target.value}`))}
+          >
+            <option value="status">Group by status</option>
+            <option value="stage">Group by stage</option>
+          </select>
+        </label>
         <label className="check">
           <input type="checkbox" checked={includeClosed} onChange={toggleClosed} />
           Show closed
@@ -166,6 +191,7 @@ function KanbanCard({
       <span className="card-meta">
         <span className="mono">{spokeId(n.id)}</span>
         {n.kind === "area" && <span className="chip">area</span>}
+        <TypeStageChips node={n} />
         {prio !== null && (
           <span className={`chip prio-chip p${prio}`} title={`Priority ${prio}`}>
             P{prio}

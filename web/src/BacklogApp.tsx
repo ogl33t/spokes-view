@@ -6,10 +6,28 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { buildOutline, visibleRows, type Row } from "./backlog";
-import { clock, dueText, markers, spokeId, STATUS_LABEL } from "./format";
+import {
+  buildOutline,
+  isFiltering,
+  NO_FILTER,
+  visibleRows,
+  type Row,
+  type RowFilter,
+} from "./backlog";
+import {
+  clock,
+  dueText,
+  markers,
+  NODE_TYPES,
+  spokeId,
+  STAGE_LABEL,
+  STAGES,
+  STATUS_LABEL,
+  TYPE_LABEL,
+} from "./format";
 import { kanbanUrl } from "./kanban";
 import { NodeModal } from "./NodeModal";
+import { TypeStageChips } from "./TypeStageChips";
 import { useSubtree } from "./useSubtree";
 import { ViewLinks } from "./ViewLinks";
 
@@ -34,14 +52,14 @@ export function BacklogApp({ server, rootId }: Props): ReactElement {
     closeDetail,
   } = useSubtree(server, rootId);
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useState<RowFilter>(NO_FILTER);
 
   const outline = useMemo(() => (data ? buildOutline(data) : []), [data]);
   const rows = useMemo(() => visibleRows(outline, collapsed, filter), [outline, collapsed, filter]);
   const nodesById = useMemo(() => new Map(data?.nodes.map((n) => [n.id, n])), [data]);
   const rootNode = nodesById.get(rootId);
   const today = data?.today ?? "";
-  const filtering = filter.trim() !== "";
+  const filtering = isFiltering(filter);
 
   const toggle = useCallback((id: number) => {
     setCollapsed((c) => {
@@ -80,7 +98,7 @@ export function BacklogApp({ server, rootId }: Props): ReactElement {
       </Message>
     );
   } else if (rows.length === 0) {
-    body = <Message title="No matches">Nothing here matches “{filter.trim()}”.</Message>;
+    body = <Message title="No matches">Nothing here matches the current filters.</Message>;
   } else {
     body = (
       <ol className="backlog" aria-label="Backlog">
@@ -126,9 +144,43 @@ export function BacklogApp({ server, rootId }: Props): ReactElement {
           <input
             type="search"
             placeholder="Filter by title or SPOKE-N"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            value={filter.text}
+            onChange={(e) => setFilter((f) => ({ ...f, text: e.target.value }))}
           />
+        </label>
+        <label className="filter">
+          <span className="sr-only">Type</span>
+          <select
+            value={filter.type}
+            onChange={(e) =>
+              setFilter((f) => ({ ...f, type: e.target.value as RowFilter["type"] }))
+            }
+          >
+            <option value="any">Any type</option>
+            {NODE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {TYPE_LABEL[t]}
+              </option>
+            ))}
+            <option value="none">No type</option>
+          </select>
+        </label>
+        <label className="filter">
+          <span className="sr-only">Stage</span>
+          <select
+            value={filter.stage}
+            onChange={(e) =>
+              setFilter((f) => ({ ...f, stage: e.target.value as RowFilter["stage"] }))
+            }
+          >
+            <option value="any">Any stage</option>
+            {STAGES.map((st) => (
+              <option key={st} value={st}>
+                {STAGE_LABEL[st]}
+              </option>
+            ))}
+            <option value="none">No stage</option>
+          </select>
         </label>
         <label className="check">
           <input type="checkbox" checked={includeClosed} onChange={toggleClosed} />
@@ -228,6 +280,7 @@ function BacklogRow({
         <span className="row-meta">
           <span className="mono">{spokeId(n.id)}</span>
           {n.kind === "area" && <span className="chip">area</span>}
+          <TypeStageChips node={n} />
           {prio !== null && (
             <span className={`chip prio-chip p${prio}`} title={`Priority ${prio}`}>
               P{prio}

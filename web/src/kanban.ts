@@ -1,11 +1,24 @@
+import { STAGE_LABEL, STAGES, stageOf, STATUS_LABEL } from "./format";
 import type { Crumb, Status, TreeResponse, ViewNode } from "./types";
 
 /** URL parameter that turns the page into a kanban board of one node's descendants. */
 export const KANBAN_PARAM = "kanban";
 
+/** URL parameter that picks what the board's columns are. */
+export const GROUP_PARAM = "group";
+
+/** What the board's columns stand for. */
+export type Grouping = "status" | "stage";
+
+/** The grouping from a query string: stage only for `group=stage`, status otherwise. */
+export function groupingFrom(search: string): Grouping {
+  return new URLSearchParams(search).get(GROUP_PARAM) === "stage" ? "stage" : "status";
+}
+
 /** The page that shows `id`'s descendants on `server` as a kanban board. */
-export function kanbanUrl(server: string, id: number): string {
+export function kanbanUrl(server: string, id: number, group?: Grouping): string {
   const q = new URLSearchParams({ server, [KANBAN_PARAM]: String(id) });
+  if (group === "stage") q.set(GROUP_PARAM, "stage");
   return `/?${q.toString()}`;
 }
 
@@ -24,7 +37,9 @@ export interface Card {
 }
 
 export interface Column {
-  status: Status;
+  /** A status, a stage, or "none" for nodes without a stage. */
+  key: string;
+  label: string;
   cards: Card[];
 }
 
@@ -63,7 +78,11 @@ export function compareNodes(x: ViewNode, y: ViewNode): number {
  * Every node beneath the slice's root, in one column per status, each with its path
  * below the root so a flattened card still says where it lives.
  */
-export function buildBoard(slice: TreeResponse, includeClosed: boolean): Column[] {
+export function buildBoard(
+  slice: TreeResponse,
+  includeClosed: boolean,
+  group: Grouping = "status",
+): Column[] {
   const byId = new Map(slice.nodes.map((n) => [n.id, n]));
   /** The path below the root, or null when `n` is not beneath the root. */
   const pathOf = (n: ViewNode): Crumb[] | null => {
@@ -80,12 +99,23 @@ export function buildBoard(slice: TreeResponse, includeClosed: boolean): Column[
     }
     return out.reverse();
   };
-  const columns = columnsFor(includeClosed).map((status) => ({ status, cards: [] as Card[] }));
-  const byStatus = new Map(columns.map((c) => [c.status, c]));
+  const columns: Column[] =
+    group === "stage"
+      ? [
+          ...STAGES.map((s) => ({ key: s, label: STAGE_LABEL[s], cards: [] as Card[] })),
+          { key: "none", label: "No stage", cards: [] as Card[] },
+        ]
+      : columnsFor(includeClosed).map((s) => ({
+          key: s,
+          label: STATUS_LABEL[s],
+          cards: [] as Card[],
+        }));
+  const byKey = new Map(columns.map((c) => [c.key, c]));
+  const keyOf = (n: ViewNode): string => (group === "stage" ? (stageOf(n) ?? "none") : n.status);
   for (const n of slice.nodes) {
     if (n.id === slice.root) continue;
     const path = pathOf(n);
-    if (path) byStatus.get(n.status)?.cards.push({ node: n, path });
+    if (path) byKey.get(keyOf(n))?.cards.push({ node: n, path });
   }
   for (const c of columns) c.cards.sort(compareCards);
   return columns;

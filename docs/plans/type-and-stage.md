@@ -1,8 +1,8 @@
 ---
-status: Planned
+status: Done
 spoke: SPOKE-203
-started:
-finished:
+started: 2026-11-23
+finished: 2026-11-23
 summary: Show Spokes 0.4.0 type and stage in spokes-view - badges, Backlog filters, and a group-by-stage Kanban board.
 ---
 
@@ -135,3 +135,33 @@ Not authorized (stop and ask): release tags, any `ogl33t/stacks` commit, deploym
 - Data is sparse: almost no node has type/stage set yet (bk-flow writes `Stage:` lines into notes, not the field), so the new UI will look mostly empty until bk-flow sets the fields too.
 - The stage board with closed nodes hidden shows few "done" cards. That is by design (Show closed loads them).
 - Nine stage columns are wide on a phone; horizontal scroll is acceptable.
+
+## What shipped
+
+All five steps landed on `feat/type-stage` (version 0.5.0).
+
+- **Step 1:** `NodeType`/`Stage` types and optional `type`/`stage` on `ViewNode`. `NODE_TYPES`, `STAGES`, `TYPE_LABEL`, `STAGE_LABEL`, `typeOf`, `stageOf` in `format.ts`. New `TypeStageChips.tsx` and `--t-*` colours, `.type-chip.t-*` and `.stage-chip` in `styles.css`.
+- **Step 2:** Type and Stage rows in node details (before Priority), and chips after the `area` chip on Backlog rows and Kanban cards.
+- **Step 3:** `RowFilter`/`NO_FILTER` in `backlog.ts`, with Type and Stage selects in the Backlog header.
+- **Step 4:** `Grouping`, `GROUP_PARAM`, `groupingFrom`, `kanbanUrl(..., group)`, `Column {key,label,cards}`, and `buildBoard(..., group)` in `kanban.ts`. A "Group by" select in the Kanban header kept in the URL with `replaceState`.
+- **Step 5:** README updated, and the version bumped to 0.5.0 in `Cargo.toml` and `Cargo.lock`.
+
+Tested:
+- `npm run lint`, `format:check`, `typecheck`, `test` (59 tests) and `build` pass.
+- `cargo fmt --check`, `clippy -D warnings` and `cargo test` pass.
+- Live check against `http://kdev3:10050` with headless Chromium, on the spokes-view node (SPOKE-109):
+  - SPOKE-203 shows `feature`/`understood` chips on its Backlog row and Kanban card, and Type/Stage rows in the details modal.
+  - Type=feature leaves only SPOKE-203. Stage="No stage" works, and clearing the filters restores the outline.
+  - `&group=stage` with Show closed shows 9 columns, with SPOKE-203 under Understood and 18 cards under No stage.
+  - The grouping survives a reload. Switching to Status removes `group` from the URL and shows the status columns.
+
+Untested:
+- Phone width with 9 columns. The CSS already scrolls the board sideways.
+- Dark-mode colours of the new chips. The tests ran in light mode only.
+
+Deviations:
+- `backlog.ts` also exports `isFiltering(f)`.
+- The Backlog "No matches" text is now "Nothing here matches the current filters." because the filter may be type or stage only.
+- No `styles.css` change was needed for the stage board: `.board` already scrolls sideways.
+- The Kanban status board's column dot is shown only for status grouping.
+- The header selects use the browser's default select styling, as the plan asked: no new CSS.

@@ -22,6 +22,12 @@
   --p3: #e0af68;
   --p4: #8f97b3;
 
+  --t-bug: #f7768e;
+  --t-feature: #7aa2f7;
+  --t-chore: #8f97b3;
+  --t-idea: #e0af68;
+  --t-epic: #bb9af7;
+
   color-scheme: dark;
   font-family:
     system-ui,
@@ -57,6 +63,11 @@
     --p2: #c85a12;
     --p3: #a8650a;
     --p4: #6b7390;
+    --t-bug: #c4213d;
+    --t-feature: #2f5fd0;
+    --t-chore: #6b7390;
+    --t-idea: #a8650a;
+    --t-epic: #7b4fd1;
     color-scheme: light;
   }
 }
@@ -888,6 +899,32 @@ a.btn {
 }
 .prio-chip.p4 {
   color: var(--p4);
+}
+.type-chip.t-bug {
+  color: var(--t-bug);
+  border-color: var(--t-bug);
+}
+.type-chip.t-feature {
+  color: var(--t-feature);
+  border-color: var(--t-feature);
+}
+.type-chip.t-chore {
+  color: var(--t-chore);
+  border-color: var(--t-chore);
+}
+.type-chip.t-idea {
+  color: var(--t-idea);
+  border-color: var(--t-idea);
+}
+.type-chip.t-epic {
+  color: var(--t-epic);
+  border-color: var(--t-epic);
+}
+.stage-chip {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
 }
 
 /* ---- phone width: the panel becomes a bottom sheet ---- */
