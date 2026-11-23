@@ -158,9 +158,10 @@ All four steps landed on `feat/type-icons-stage-colours` (v0.6.0).
 - In this session, all of these passed: `npm run lint`, `format:check`, `typecheck`, `npm test` (76 tests), `npm run build`, `cargo fmt --check`, `cargo clippy --locked --all-targets -D warnings` and `cargo test --locked`.
 - End to end, the debug binary ran against the LAN Spokes (`kdev3:10050`) and was screenshotted with headless Chromium in dark and light. The shots cover the SPOKE-109 Backlog (Show closed), Kanban `&group=stage` with Show closed (all 8 columns: coloured dots on the stage columns, none on No stage), the SPOKE-209 details modal, and the open Legend.
 
-**Untested:** no live node has type `bug`, `chore` or `idea`, or stage `in_review`, so those chips were seen only as Legend entries and in the icon preview, not on real rows.
+**Untested:** no live node has type `bug`, `chore` or `idea`, so those chips were seen only as Legend entries and in the icon preview, not on real rows. (`in_review` was seen live once SPOKE-209 moved to it.)
 
 **Deviations:**
 - The Legend type icon is coloured with an inline `style={{ color: var(--t-<type>) }}` on the `legend-glyph` span, not the `type-chip` class. `.type-chip`'s inline-flex would have broken `.legend-glyph`'s fixed box.
 - `palette.test.ts` starts with `/// <reference types="node" />`, because `tsconfig.app.json` limits `types` to `vite/client`.
+- After the screenshot check, Brandon found the overall font small, so the root `font-size` in `styles.css` went from 15px to 16px. Everything is sized in `rem`, so the whole UI scaled up together. The radial graph's SVG labels are sized separately in `Graph.tsx` and did not change.
 - The plan file was copied into `docs/plans/` at the start of `/build`, because the earlier session ended before the `/gsd` copy step.
