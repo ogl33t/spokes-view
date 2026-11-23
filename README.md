@@ -10,7 +10,7 @@ The finished product:
 
 - **Pick a server** from a configured list (home, dev, test copies) and see its tree; the choice is remembered and can be linked to.
 - **Radial graph:** the root in the centre, areas and tasks radiating outward, drawn so a tree of tens of thousands of nodes stays usable: only the top levels load at first, branches load when opened, collapsed branches show how much is hidden.
-- **Everything at a glance:** status colours, areas apart from tasks, priority rings, markers for claims, stalled claims, questions waiting on the user, due and overdue dates, the focus list, deferrals, repeats, notes, type and stage badges (Spokes 0.4.0+; older servers show none) and the actionable next step of an ordered parent.
+- **Everything at a glance:** status colours, areas apart from tasks, priority rings, markers for claims, stalled claims, questions waiting on the user, due and overdue dates, the focus list, deferrals, repeats, notes, type and stage badges (types show an icon, stages have their own colours, and the Legend lists both; Spokes 0.4.0+; older servers show none) and the actionable next step of an ordered parent.
 - **Details on click:** breadcrumb, every field in readable form (dates in the server's time zone), type and stage (Spokes 0.4.0+), notes and recent events.
 - **Focus on click:** clicking a node also turns the whole tree so that node's spoke (and its label) lies horizontal, glides it to the centre and zooms in (to at least 1×, at most 2×). Drag, scroll or a zoom button stops it part-way; **Fit to view** turns the tree back north-up. With reduced motion set, it jumps without animating.
 - **Kanban view:** right-click a node (or press the menu key, or use the link in its details) and pick **View Kanban** to see every node beneath it on a board, one column per status (`/?server=<name>&kanban=<id>`). **Group by** switches the columns to stage, plus a No stage column (`&group=stage`). Cards show where they sit below the board's root; clicking one opens its details in a modal.
@@ -156,4 +156,6 @@ Release process: push to `main`, wait for green, then tag that commit `vX.Y.Z` w
 | `web/src/treeStore.ts` | Merging loaded slices into one tree (pure) |
 | `web/src/DetailPanel.tsx`, `web/src/Legend.tsx` | Detail panel and legend |
 | `web/src/TypeStageChips.tsx` | Type and stage chips for Backlog rows, Kanban cards and details |
+| `web/src/TypeIcon.tsx` | Inline SVG icon per type (bug, feature, chore, idea, epic) |
+| `web/src/palette.test.ts` | Checks the stage colours meet 4.5:1 contrast in both themes |
 | `web/src/format.ts`, `web/src/api.ts`, `web/src/types.ts` | Formatting and markers, the API client, API types |

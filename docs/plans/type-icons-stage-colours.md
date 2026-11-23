@@ -1,7 +1,7 @@
 ---
-status: Planned
+status: In progress
 spoke: SPOKE-209
-started:
+started: 2026-11-23
 finished:
 summary: Give each Spokes type an inline SVG icon and each stage its own colour across spokes-view's chips, Kanban stage columns and Legend.
 ---
@@ -144,3 +144,23 @@ Not authorized (stop and ask): release tags, any `ogl33t/stacks` commit, deploym
 - Light-mode idea and backlog greys are close on purpose (a quiet early-stage family). If Brandon wants them clearly apart, backlog shifts bluer.
 - `color-mix()` needs a modern browser (Safari 16.2+, Chrome 111+). That's fine for Brandon's Apple-only devices. Without it the background falls back to none, and border and text keep the colour.
 - Little live data has type or stage set, so the visual check covers only a few real nodes.
+
+## What shipped
+
+All four steps landed on `feat/type-icons-stage-colours` (v0.6.0).
+
+- **Step 1:** `web/src/TypeIcon.tsx` draws the five icons from a `Record<NodeType, ReactElement>`. The wrench is the only one that uses an SVG `transform`. Before wiring them in, the icons were checked at 14px and 64px.
+- **Step 2:** `styles.css` gains `--stage-*` variables for both themes, the `.st-*` classes, the tinted `.stage-chip`, `.stage-dot`, `.type-icon`, and `.type-chip` as inline-flex. `palette.test.ts` adds 17 tests: contrast against `--bg` and against the 16% tint, all stages present, and the dark values distinct.
+- **Step 3:** `TypeStageChips.tsx` exports `TypeChip` and `StageChip`, which `DetailPanel` now uses. Kanban stage headers show a `stage-dot`. The Legend has new Type and Stage sections.
+- **Step 4:** the README has the badges line and two Layout rows. The version is 0.6.0 in `Cargo.toml` and `Cargo.lock`.
+
+**Tested how:**
+- In this session, all of these passed: `npm run lint`, `format:check`, `typecheck`, `npm test` (76 tests), `npm run build`, `cargo fmt --check`, `cargo clippy --locked --all-targets -D warnings` and `cargo test --locked`.
+- End to end, the debug binary ran against the LAN Spokes (`kdev3:10050`) and was screenshotted with headless Chromium in dark and light. The shots cover the SPOKE-109 Backlog (Show closed), Kanban `&group=stage` with Show closed (all 8 columns: coloured dots on the stage columns, none on No stage), the SPOKE-209 details modal, and the open Legend.
+
+**Untested:** no live node has type `bug`, `chore` or `idea`, or stage `in_review`, so those chips were seen only as Legend entries and in the icon preview, not on real rows.
+
+**Deviations:**
+- The Legend type icon is coloured with an inline `style={{ color: var(--t-<type>) }}` on the `legend-glyph` span, not the `type-chip` class. `.type-chip`'s inline-flex would have broken `.legend-glyph`'s fixed box.
+- `palette.test.ts` starts with `/// <reference types="node" />`, because `tsconfig.app.json` limits `types` to `vite/client`.
+- The plan file was copied into `docs/plans/` at the start of `/build`, because the earlier session ended before the `/gsd` copy step.

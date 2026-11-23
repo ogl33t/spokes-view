@@ -79,6 +79,9 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
               {group === "status" && (
                 <span className={`status-dot s-${col.key}`} aria-hidden="true" />
               )}
+              {group === "stage" && col.key !== "none" && (
+                <span className={`stage-dot st-${col.key}`} aria-hidden="true" />
+              )}
               {col.label}
               <span className="count">{col.cards.length}</span>
             </h2>

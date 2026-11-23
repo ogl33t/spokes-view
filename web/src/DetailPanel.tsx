@@ -5,13 +5,12 @@ import {
   formatInstant,
   markers,
   spokeId,
-  STAGE_LABEL,
   stageOf,
   STATUS_LABEL,
-  TYPE_LABEL,
   typeOf,
 } from "./format";
 import type { NodeResponse, ViewNode } from "./types";
+import { StageChip, TypeChip } from "./TypeStageChips";
 import { ViewLinks } from "./ViewLinks";
 
 /** Event details carry UTC instants (e.g. a lease end); show them in the server's zone. */
@@ -137,12 +136,12 @@ export function NodeDetails(props: DetailsProps): ReactElement {
           <dl className="fields">
             {type !== null && (
               <Row label="Type">
-                <span className={`chip type-chip t-${type}`}>{TYPE_LABEL[type]}</span>
+                <TypeChip type={type} />
               </Row>
             )}
             {stage !== null && (
               <Row label="Stage">
-                <span className="chip stage-chip">{STAGE_LABEL[stage]}</span>
+                <StageChip stage={stage} />
               </Row>
             )}
             {n.effective_priority !== null && (
