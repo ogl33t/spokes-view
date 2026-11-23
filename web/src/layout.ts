@@ -9,7 +9,10 @@
  *    radius is scaled up by the same factor (which shrinks every need by it).
  * 3. Angles are handed out top-down: a child gets a share of its parent's wedge in
  *    proportion to its need, and sits in the middle of its share. Spare angle is spread
- *    the same way, so small trees fill the circle.
+ *    the same way, so small trees fill the circle. Below the root, a child's share is
+ *    capped at its comfortable width: `maxSpread` of arc per leaf, summed up the branch
+ *    (never less than its need). The run of children is centred in the parent's wedge, so a
+ *    few leaves stay grouped under their parent.
  *
  * Wedges of nodes on one ring never overlap, so two nodes on the same ring are always at
  * least `spacing` apart along the ring. Cost is linear in the number of visible nodes.
@@ -20,6 +23,12 @@ export interface LayoutOptions {
   spacing: number;
   /** Least distance between rings. */
   ringGap: number;
+  /**
+   * Comfortable arc length per leaf (layout units, on its own ring). Below the root, a
+   * child's share is capped at its comfortable width: `maxSpread` of arc per leaf, summed
+   * up the branch. Unset means no cap.
+   */
+  maxSpread?: number;
 }
 
 export interface NodePos {
@@ -47,7 +56,7 @@ export interface Layout {
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
-export const DEFAULT_LAYOUT: LayoutOptions = { spacing: 22, ringGap: 190 };
+export const DEFAULT_LAYOUT: LayoutOptions = { spacing: 22, ringGap: 190, maxSpread: 66 };
 
 const TAU = Math.PI * 2;
 
@@ -56,7 +65,7 @@ export function layoutRadial(
   childrenOf: (id: number) => readonly number[],
   options: LayoutOptions = DEFAULT_LAYOUT,
 ): Layout {
-  const { spacing, ringGap } = options;
+  const { spacing, ringGap, maxSpread } = options;
 
   // Pre-order walk (iterative, so a very deep chain cannot overflow the stack).
   const order: number[] = [];
@@ -110,6 +119,19 @@ export function layoutRadial(
     for (const [id, v] of need) need.set(id, v / scale);
   }
 
+  // Comfortable widths, bottom-up, on the final radii.
+  const comfy = new Map<number, number>();
+  if (maxSpread !== undefined) {
+    for (let i = order.length - 1; i >= 0; i--) {
+      const id = order[i] as number;
+      const d = depthOf.get(id) ?? 0;
+      let sum = 0;
+      for (const k of kids.get(id) ?? []) sum += comfy.get(k) ?? 0;
+      const own = d === 0 ? 0 : maxSpread / (radii[d] ?? 1);
+      comfy.set(id, Math.max(own, need.get(id) ?? 0, sum));
+    }
+  }
+
   // 3. Angles, top-down.
   const start = new Map<number, number>([[rootId, 0]]);
   const span = new Map<number, number>([[rootId, TAU]]);
@@ -126,13 +148,20 @@ export function layoutRadial(
     const c = kids.get(id) ?? [];
     let sum = 0;
     for (const k of c) sum += need.get(k) ?? 0;
-    let at = s;
-    for (const k of c) {
-      const share = sum > 0 ? (w * (need.get(k) ?? 0)) / sum : w / c.length;
+    const shares = c.map((k) => {
+      const proportional = sum > 0 ? (w * (need.get(k) ?? 0)) / sum : w / c.length;
+      if (d === 0 || maxSpread === undefined) return proportional;
+      return Math.min(proportional, comfy.get(k) ?? proportional);
+    });
+    let used = 0;
+    for (const share of shares) used += share;
+    let at = s + (w - used) / 2;
+    c.forEach((k, i) => {
+      const share = shares[i] as number;
       start.set(k, at);
       span.set(k, share);
       at += share;
-    }
+    });
     const angle = d === 0 ? 0 : s + w / 2;
     const r = radii[d] ?? 0;
     const x = r === 0 ? 0 : r * Math.sin(angle);

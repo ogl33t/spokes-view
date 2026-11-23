@@ -106,12 +106,59 @@ Files: `web/src/treeStore.ts`, `web/src/treeStore.test.ts`, `web/src/App.tsx`, `
 Acceptance: right-clicking a node and picking "Close others" leaves only the root-to-node path, the node and its open sub-branches, plus the siblings of path nodes as closed dots. The root's menu doesn't offer it.
 Verify: `cd web && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`.
 
+### Step 6: Balanced glyph and label size when zoomed in (added 2026-11-23, review feedback, independent of Step 7)
+
+Files: new `web/src/zoomScale.ts`, new `web/src/zoomScale.test.ts`, `web/src/Graph.tsx`.
+
+Problem: in `Graph.tsx` `Nodes`, labels stay a fixed 13.5px on screen (`font = FONT / k`), but past 1× glyphs scale fully with zoom (`z` is 1), so at 4× a circle is 4× bigger next to the same small text.
+
+- `zoomScale.ts` exports `ZOOM_GROW = 0.4` and two pure functions:
+  - `onScreenGrowth(k: number): number`, which returns `k >= 1 ? k ** ZOOM_GROW : 1`.
+  - `glyphScale(k: number, room: number, r: number): number`, the scale applied to a node's glyph group in layout units. For `k < 1` it keeps today's formula, `Math.max(1, Math.min(1 / k, 2.5, (0.4 * room) / r))`. For `k >= 1` it returns `onScreenGrowth(k) / k`, so the glyph's on-screen size is `r * k^0.4`.
+- `Graph.tsx`: `const font = (FONT * onScreenGrowth(k)) / k;` and `const z = glyphScale(k, p.room, r);`. Keep the `z === 1` check, and compare with a tolerance, since `z` is now fractional. Keep `showLabel`'s threshold in on-screen pixels: `p.room * k >= FONT * onScreenGrowth(k) + 2`. Change nothing else.
+- Tests: `onScreenGrowth(1) === 1` and `onScreenGrowth(4) ≈ 1.741`. For `k >= 1`, on-screen glyph size (`glyphScale * k`) and on-screen font grow by the same factor. For `k < 1`, the result matches the old formula.
+
+Acceptance: from 1× to 4×, glyphs and labels grow together, about 1.74× at 4×. Zoomed out, nothing changes.
+Verify: `cd web && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`.
+
+### Step 7: Cap how far apart siblings spread (added 2026-11-23, review feedback, independent of Step 6)
+
+Files: `web/src/layout.ts`, `web/src/layout.test.ts`.
+
+Problem: step 3 of `layoutRadial` hands a parent's whole wedge to its children in proportion to need, so a few leaves under a wide wedge end up very far apart along their ring.
+
+- `LayoutOptions` gains an optional `maxSpread?: number`, the most arc length (layout units, on the children's ring) a child's share may take beyond its need. `DEFAULT_LAYOUT` becomes `{ spacing: 22, ringGap: 190, maxSpread: 66 }`. When `maxSpread` is undefined, behaviour is unchanged, which keeps the existing tests valid.
+- In step 3, for a parent at depth ≥ 1 (the root's children still fill the circle), give each child `share = Math.min(proportional, Math.max(need(k), maxSpread / radii[d + 1]))`. Centre the run of children in the parent's wedge by starting at `s + (w - sumOfShares) / 2`. Children stay inside the parent's wedge, and each share is still at least its need, so the no-overlap guarantee holds.
+- Update the header comment's point 3 to describe the cap.
+- Tests, using `maxSpread`:
+  - Under a depth ≥ 1 parent, neighbouring siblings are at most about `maxSpread` apart along their ring.
+  - Children stay inside the parent's wedge.
+  - The root's children still spread around the full circle.
+  - The minimum ring gap still holds (`minRingGap`).
+
+Acceptance: a parent with a few leaves keeps them grouped under it, not fanned across its whole wedge. All existing layout tests pass.
+Verify: `cd web && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`.
+
+### Step 8: Area squares sit square to their spoke (added 2026-11-23, review feedback)
+
+Files: `web/src/Graph.tsx` only.
+
+Problem: in `Nodes`, an area's glyph is `<rect className="shape" x={-r} y={-r} width={r * 2} height={r * 2} rx={3} />`, axis-aligned in layout space. The tree is often rotated (click-to-focus turns the view), so a square sits at an arbitrary angle to its spoke. Every edge (`edgePath`) reaches a node along its radial line, so a square should be rotated by the node's own angle.
+
+- Give the area `rect` `transform={`rotate(${((p.angle * 180) / Math.PI).toFixed(2)})`}` (`p.angle` is radians, 0 = up, clockwise, matching SVG's clockwise `rotate`). The root is a circle and needs nothing. Apply the same rotation to any other square-shaped decoration drawn for areas (check the `collapsed-halo`, `busy` and `prio` rings: circles need no change). Change nothing else.
+- If a CSS rule in `styles.css` assumes the rect is unrotated (for example a `transform` on `.node.k-area .shape`), report it rather than editing CSS.
+
+Acceptance: whatever the view's rotation, before or after a refresh, and after click-to-focus turns the tree, each area square has two sides perpendicular to the spoke line through it.
+Verify: `cd web && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`.
+
 ## Batches
 
 1. Batch 1: Steps 1 and 2 in parallel (disjoint files).
 2. Batch 2: Step 3.
 3. Batch 3: Step 4.
 4. Batch 4: Step 5 (added in review).
+5. Batch 5: Steps 6 and 7 in parallel (added in review, disjoint files).
+6. Batch 6: Step 8 (added in review).
 
 Then in the main session: build, run
 `SPOKES_VIEW_SERVERS="Home=http://kdev3:10050" SPOKES_VIEW_BIND=127.0.0.1:8799 ./target/debug/spokes-view`,
@@ -166,6 +213,9 @@ All four steps landed on `feat/type-icons-stage-colours` (v0.6.0).
 - **Step 2:** `styles.css` gains `--stage-*` variables for both themes, the `.st-*` classes, the tinted `.stage-chip`, `.stage-dot`, `.type-icon`, and `.type-chip` as inline-flex. `palette.test.ts` adds 17 tests: contrast against `--bg` and against the 16% tint, all stages present, and the dark values distinct.
 - **Step 3:** `TypeStageChips.tsx` exports `TypeChip` and `StageChip`, which `DetailPanel` now uses. Kanban stage headers show a `stage-dot`. The Legend has new Type and Stage sections.
 - **Step 5 (added in review):** `closeOthers()` in `treeStore.ts` has 5 tests. "Close others" is in the tree's right-click menu for every node except the root, and the README mentions it. Tested live: on SPOKE-109 it took the tree from 90 drawn nodes to 17 (the root-to-node path plus closed siblings), and the root's menu doesn't offer it.
+- **Step 6 (added in review):** new `zoomScale.ts` exports `onScreenGrowth(k) = k^0.4` past 1× and `glyphScale`, with tests. Past 1×, glyphs and labels grow together. On l33t-bbq, glyph and label measured 19/16px at 1×, 25/21px at 2× and 32/26px at 4×; the old build gave 77/15px at 4×. Zoomed out, nothing changed.
+- **Step 7 (added in review):** `layoutRadial` takes `maxSpread` (default 66). Below the root, a child's share is capped at its comfortable width: `maxSpread` of arc per leaf, summed up the branch. The first version capped each share at `max(need, maxSpread / r)`. That compounded down the tree, so leaves were packed at the minimum spacing and the overview lost its labels. It was replaced with the bottom-up rule before commit. The full-tree overview looks the same as before. In a sparse view (after "Close others" on l33t-bbq, at 2×), the screen shows 11 nodes against 7 before, grouped under their parent.
+- **Step 8 (added in review):** area squares, and their alert dot, are rotated by the node's angle. The spoke always meets a square side-on, at any view rotation, after click-to-focus and after reload.
 - **Step 4:** the README has the badges line and two Layout rows. The version is 0.6.0 in `Cargo.toml` and `Cargo.lock`.
 
 **Tested how:**

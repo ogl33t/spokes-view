@@ -7,6 +7,7 @@ import type { View } from "./focus";
 import type { Store } from "./treeStore";
 import { missingChildren, needsFetch } from "./treeStore";
 import type { ViewNode } from "./types";
+import { glyphScale, onScreenGrowth } from "./zoomScale";
 
 const MIN_K = 0.01;
 const MAX_K = 4;
@@ -475,8 +476,9 @@ interface NodesProps {
 
 const Nodes = memo(function Nodes({ layout, store, expanded, loading, k, turn }: NodesProps) {
   const today = store.meta?.today ?? "";
-  // Labels keep the same size on screen at every zoom.
-  const font = FONT / k;
+  // Labels keep the same size on screen when zoomed out and grow gently with glyphs past 1x.
+  const grow = onScreenGrowth(k);
+  const font = (FONT * grow) / k;
   return (
     <g className="nodes">
       {layout.nodes.map((p) => {
@@ -489,7 +491,7 @@ const Nodes = memo(function Nodes({ layout, store, expanded, loading, k, turn }:
         const busy = loading.has(n.id);
         const ms = markers(n, today);
         // A label shows when its wedge is tall enough on screen for one line of text.
-        const showLabel = p.depth === 0 || p.room * k >= FONT + 2;
+        const showLabel = p.depth === 0 || p.room * k >= FONT * grow + 2;
         // An open inner node gets a short level label under it; a leaf or a collapsed node
         // a long one running outward (nothing else is drawn in its wedge beyond it).
         const outward = p.depth > 0 && p.childCount === 0;
@@ -507,13 +509,15 @@ const Nodes = memo(function Nodes({ layout, store, expanded, loading, k, turn }:
           .filter(Boolean)
           .join(", ");
         const prio = n.effective_priority;
+        const squareTurn = `rotate(${((p.angle * 180) / Math.PI).toFixed(2)})`;
         const ownPrio = n.priority !== null;
         const deg = (p.angle * 180) / Math.PI - 90;
         const flip = labelFlip(p.angle, turn);
         const rot = flip ? deg + 180 : deg;
         // Zoomed out, glyphs grow back toward their on-screen size, but never wider than
-        // the node's wedge, so a dense ring does not turn into a smear.
-        const z = Math.max(1, Math.min(1 / Math.min(k, 1), 2.5, (0.4 * p.room) / r));
+        // the node's wedge, so a dense ring does not turn into a smear. Zoomed in they grow
+        // in step with the labels.
+        const z = glyphScale(k, p.room, r);
         const offset = (hasKids ? r + 20 : r + 6) * z;
         const cls = [
           "node",
@@ -538,19 +542,33 @@ const Nodes = memo(function Nodes({ layout, store, expanded, loading, k, turn }:
             aria-expanded={hasKids ? isOpen : undefined}
           >
             <title>{`${spokeId(n.id)}  ${n.title}\n${describe}`}</title>
-            <g transform={z === 1 ? undefined : `scale(${z.toFixed(3)})`}>
+            <g transform={Math.abs(z - 1) < 1e-3 ? undefined : `scale(${z.toFixed(3)})`}>
               {prio !== null && p.depth > 0 && (
                 <circle className={`prio p${prio} ${ownPrio ? "own" : "inherited"}`} r={r + 3.5} />
               )}
               {collapsed && <circle className="collapsed-halo" r={r + (prio ? 7 : 4)} />}
               {busy && <circle className="busy" r={r + 9} />}
               {n.kind === "area" && p.depth > 0 ? (
-                <rect className="shape" x={-r} y={-r} width={r * 2} height={r * 2} rx={3} />
+                <rect
+                  className="shape"
+                  x={-r}
+                  y={-r}
+                  width={r * 2}
+                  height={r * 2}
+                  rx={3}
+                  transform={squareTurn}
+                />
               ) : (
                 <circle className="shape" r={r} />
               )}
               {isAlert(n, today) && (
-                <circle className="alert-dot" cx={r * 0.8} cy={-r * 0.8} r={3.2} />
+                <circle
+                  className="alert-dot"
+                  cx={r * 0.8}
+                  cy={-r * 0.8}
+                  r={3.2}
+                  transform={n.kind === "area" && p.depth > 0 ? squareTurn : undefined}
+                />
               )}
               {hasKids && p.depth > 0 && (
                 <g

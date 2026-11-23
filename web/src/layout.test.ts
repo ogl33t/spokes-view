@@ -128,4 +128,63 @@ describe("layoutRadial", () => {
     const t = tree(generated([4, 6]));
     expect(layoutRadial(1, t, opts).nodes).toEqual(layoutRadial(1, t, opts).nodes);
   });
+
+  describe("maxSpread", () => {
+    const capped = { ...opts, maxSpread: 60 };
+    const table = { 1: [2, 3], 2: [4, 5, 6], 3: [7] };
+
+    it("keeps siblings under a non-root parent close together", () => {
+      const l = layoutRadial(1, tree(table), capped);
+      const r = l.radii[2] ?? 0;
+      const [a, b, c] = [4, 5, 6].map((id) => l.byId.get(id)?.angle ?? 0);
+      const slack = 1e-9;
+      expect(((b as number) - (a as number)) * r).toBeLessThanOrEqual(capped.maxSpread + slack);
+      expect(((c as number) - (b as number)) * r).toBeLessThanOrEqual(capped.maxSpread + slack);
+      // Without the cap they fan across the whole wedge.
+      const free = layoutRadial(1, tree(table), opts);
+      const fa = free.byId.get(4)?.angle ?? 0;
+      const fb = free.byId.get(5)?.angle ?? 0;
+      expect((fb - fa) * (free.radii[2] ?? 0)).toBeGreaterThan(capped.maxSpread);
+    });
+
+    it("keeps children inside the parent's wedge", () => {
+      const l = layoutRadial(1, tree(generated([3, 3, 2])), capped);
+      for (const n of l.nodes) {
+        if (n.parent === null) continue;
+        const p = l.byId.get(n.parent);
+        if (!p || p.depth === 0) continue;
+        expect(Math.abs(n.angle - p.angle) + n.span / 2).toBeLessThanOrEqual(p.span / 2 + 1e-9);
+      }
+    });
+
+    it("still spreads the root's children around the full circle", () => {
+      const l = layoutRadial(1, tree({ 1: [2, 3, 4] }), capped);
+      const spans = [2, 3, 4].map((id) => l.byId.get(id)?.span ?? 0);
+      expect(spans.reduce((x, y) => x + y, 0)).toBeCloseTo(Math.PI * 2, 9);
+    });
+
+    it("keeps the minimum ring gap", () => {
+      const l = layoutRadial(1, tree(generated([4, 6, 3])), capped);
+      expect(minRingGap(l)).toBeGreaterThanOrEqual(capped.spacing - 1e-6);
+    });
+
+    it("keeps a mid-level node's leaves about maxSpread apart, not packed at spacing", () => {
+      const leaves = Array.from({ length: 12 }, (_, i) => 100 + i);
+      const l = layoutRadial(1, tree({ 1: [2, 3, 4, 5], 2: [6], 6: leaves }), capped);
+      const r = l.radii[3] ?? 0;
+      const b = l.byId.get(6);
+      const angles = leaves.map((id) => l.byId.get(id)?.angle ?? 0);
+      for (let i = 1; i < angles.length; i++) {
+        const gap = ((angles[i] as number) - (angles[i - 1] as number)) * r;
+        expect(gap).toBeGreaterThan(capped.spacing + 1);
+        expect(gap).toBeLessThanOrEqual(capped.maxSpread + 1e-6);
+      }
+      for (const id of leaves) {
+        const n = l.byId.get(id);
+        expect(
+          Math.abs((n?.angle ?? 0) - (b?.angle ?? 0)) + (n?.span ?? 0) / 2,
+        ).toBeLessThanOrEqual((b?.span ?? 0) / 2 + 1e-9);
+      }
+    });
+  });
 });
