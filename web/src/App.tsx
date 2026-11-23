@@ -20,6 +20,7 @@ import { Legend } from "./Legend";
 import {
   ancestors,
   buildStore,
+  closeOthers,
   fullExpansion,
   initialExpansion,
   knownChildren,
@@ -600,6 +601,18 @@ export function App(): ReactElement {
                         ? "Collapse branch"
                         : "Expand branch",
                     onPick: () => void toggle(menuNode.id),
+                  },
+                ]
+              : []),
+            ...(menuNode.id !== ROOT_ID
+              ? [
+                  {
+                    label: "Close others",
+                    onPick: () => {
+                      setExpanded(closeOthers(store, expanded, menuNode.id));
+                      setExpandNote(null);
+                      setFitKey((k) => k + 1);
+                    },
                   },
                 ]
               : []),

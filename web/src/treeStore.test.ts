@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   ancestors,
   buildStore,
+  closeOthers,
   fullExpansion,
   initialExpansion,
   knownChildren,
   missingChildren,
   needsFetch,
+  ROOT_ID,
 } from "./treeStore";
 import type { TreeResponse, ViewNode } from "./types";
 
@@ -163,5 +165,53 @@ describe("fullExpansion", () => {
     expect([...plan.expanded]).toEqual([1]);
     expect(plan.pending).toEqual([]);
     expect(plan.limited).toBe(true);
+  });
+});
+
+describe("closeOthers", () => {
+  const store = buildStore([
+    slice(1, [
+      node(1, null, { child_count: 2 }),
+      node(2, 1, { child_count: 2 }),
+      node(3, 1, { child_count: 1 }),
+      node(4, 2, { child_count: 2 }),
+      node(5, 2, { child_count: 1 }),
+      node(6, 4, { child_count: 1 }),
+      node(7, 4),
+      node(8, 3),
+      node(9, 5),
+      node(10, 6),
+    ]),
+  ]);
+  const open = new Set([1, 2, 3, 4, 5, 6]);
+
+  it("collapses sibling branches", () => {
+    const next = closeOthers(store, open, 4);
+    expect(next.has(3)).toBe(false);
+    expect(next.has(5)).toBe(false);
+  });
+
+  it("keeps the path to the node open", () => {
+    const next = closeOthers(store, open, 4);
+    expect(next.has(1)).toBe(true);
+    expect(next.has(2)).toBe(true);
+  });
+
+  it("keeps the node's own open descendants open", () => {
+    const next = closeOthers(store, open, 4);
+    expect(next.has(4)).toBe(true);
+    expect(next.has(6)).toBe(true);
+  });
+
+  it("leaves a collapsed node collapsed", () => {
+    const next = closeOthers(store, new Set([1, 2, 6]), 4);
+    expect(next.has(4)).toBe(false);
+    expect(next.has(6)).toBe(true);
+  });
+
+  it("always includes the root and does not mutate the input", () => {
+    const input = new Set([2]);
+    expect(closeOthers(store, input, 3).has(ROOT_ID)).toBe(true);
+    expect([...input]).toEqual([2]);
   });
 });

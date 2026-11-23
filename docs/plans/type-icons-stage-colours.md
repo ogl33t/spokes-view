@@ -94,11 +94,24 @@ Files: `README.md`, `Cargo.toml`, `Cargo.lock` (repo root).
 Acceptance: the README describes the shipped behaviour, the version is 0.6.0 in both files, and every check passes.
 Verify (from repo root): `cd web && npm ci && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build && cd .. && cargo fmt --all --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked`.
 
+### Step 5: "Close others" in the tree's right-click menu (added 2026-11-23, at Brandon's request during review)
+
+Files: `web/src/treeStore.ts`, `web/src/treeStore.test.ts`, `web/src/App.tsx`, `README.md`.
+
+- `treeStore.ts`: add `export function closeOthers(store: Store, expanded: ReadonlySet<number>, id: number): Set<number>`. It returns a new set: `ROOT_ID`, every id in `ancestors(store, id)`, and every id in `expanded` that is `id` or a descendant of `id` (walk `knownChildren` from `id`). Everything else is dropped. Nothing is fetched.
+- `treeStore.test.ts`: cover sibling branches collapsing, the ancestor path staying open, the node's own expanded descendants staying open, a collapsed node staying collapsed, and the root always in the set.
+- `App.tsx`: in the `ContextMenu` items, after the Expand/Collapse branch item, add `{ label: "Close others", onPick: ... }` for every node except `ROOT_ID`. It calls `setExpanded(closeOthers(store, expanded, menuNode.id))`, `setExpandNote(null)` and `setFitKey((k) => k + 1)` (the same refit "Collapse all" does).
+- README: in the feature list where the right-click menu or Collapse all is described, add that **Close others** collapses every branch except the path to that node and the node's own branch.
+
+Acceptance: right-clicking a node and picking "Close others" leaves only the root-to-node path, the node and its open sub-branches, plus the siblings of path nodes as closed dots. The root's menu doesn't offer it.
+Verify: `cd web && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`.
+
 ## Batches
 
 1. Batch 1: Steps 1 and 2 in parallel (disjoint files).
 2. Batch 2: Step 3.
 3. Batch 3: Step 4.
+4. Batch 4: Step 5 (added in review).
 
 Then in the main session: build, run
 `SPOKES_VIEW_SERVERS="Home=http://kdev3:10050" SPOKES_VIEW_BIND=127.0.0.1:8799 ./target/debug/spokes-view`,
@@ -152,6 +165,7 @@ All four steps landed on `feat/type-icons-stage-colours` (v0.6.0).
 - **Step 1:** `web/src/TypeIcon.tsx` draws the five icons from a `Record<NodeType, ReactElement>`. The wrench is the only one that uses an SVG `transform`. Before wiring them in, the icons were checked at 14px and 64px.
 - **Step 2:** `styles.css` gains `--stage-*` variables for both themes, the `.st-*` classes, the tinted `.stage-chip`, `.stage-dot`, `.type-icon`, and `.type-chip` as inline-flex. `palette.test.ts` adds 17 tests: contrast against `--bg` and against the 16% tint, all stages present, and the dark values distinct.
 - **Step 3:** `TypeStageChips.tsx` exports `TypeChip` and `StageChip`, which `DetailPanel` now uses. Kanban stage headers show a `stage-dot`. The Legend has new Type and Stage sections.
+- **Step 5 (added in review):** `closeOthers()` in `treeStore.ts` has 5 tests. "Close others" is in the tree's right-click menu for every node except the root, and the README mentions it. Tested live: on SPOKE-109 it took the tree from 90 drawn nodes to 17 (the root-to-node path plus closed siblings), and the root's menu doesn't offer it.
 - **Step 4:** the README has the badges line and two Layout rows. The version is 0.6.0 in `Cargo.toml` and `Cargo.lock`.
 
 **Tested how:**

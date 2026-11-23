@@ -97,6 +97,21 @@ export function ancestors(store: Store, id: number): number[] {
 }
 
 /**
+ * The expansion after "Close others" on `id`: the root, the path down to `id`, and the
+ * branches already open at or below `id`. Every other branch closes; nothing is fetched.
+ */
+export function closeOthers(store: Store, expanded: ReadonlySet<number>, id: number): Set<number> {
+  const keep = new Set<number>([ROOT_ID, ...ancestors(store, id)]);
+  const stack = [id];
+  while (stack.length > 0) {
+    const cur = stack.pop() as number;
+    if (expanded.has(cur)) keep.add(cur);
+    stack.push(...knownChildren(store, cur));
+  }
+  return keep;
+}
+
+/**
  * The expansion to start with on a server's first load: open levels from the root down
  * while the number of drawn nodes stays at or under `budget`.
  */
