@@ -232,3 +232,43 @@ Not authorized: tags, changes to other stacks, any change to Spokes itself, and 
 - **Bundle size:** two variable fonts add about 150–250 KB of woff2. They are loaded once and cached, which is acceptable on a LAN.
 - **Rotated depth numbers** can read upside down after a focus turn. They are kept upright with the same `labelFlip` rule as labels.
 - **Parallel Batch 3** depends on no files being shared between Steps 3, 4 and 5. If a step finds it needs a file another step owns, it stops and reports rather than editing it.
+
+## What shipped
+
+Branch `design-pass`, 8 commits, version 0.7.0. All eight steps are done; batches ran as planned (1, 2, 3 in parallel, 4 in parallel, 8 in the main session), except that Batch 4 started while the Step 4 rework was still running (no shared files).
+
+- **Step 1:** `styles.css` split into `graph.css`, `panel.css`, `kanban.css`, `backlog.css`. Declaration count 667 before and after. A/B screenshots of main and the branch against the same data differed only in the live clock text.
+- **Step 2:** `@fontsource-variable/atkinson-hyperlegible-next` (`wght.css`) and `@fontsource-variable/martian-mono` (`wdth.css`, so the wordmark uses width 112.5). Six woff2 files, about 135 KiB, all served from `/assets`. Tokens, Overcast light theme, `.btn`/`.btn.primary`/`.icon-btn`/`.switch`, styled selects and inputs, tinted chips. Added `--ctl-h` (36px, 44px on a phone). No existing dark value changed.
+- **Step 3:** `AppBar`, `HubMark`, `header.css`. One row at 1440 (53px) on all three pages; 93px on a phone. `initialBudget` (60 below 600px).
+- **Step 4:** `labels.ts` (`placeInnerLabels`, `fitPadding`, `labelledBounds`), hub with nubs, rims with depth numbers. Home at 1440×900: 95 leaf labels, none past the viewport, no inner overlaps.
+- **Step 5:** details panel, legend (with the Hub and rims entry), context menu, modal, phone sheet. No hex literals in `panel.css`.
+- **Step 6:** Kanban column bars, sticky headers, mono counts, "Nothing here" slots, three-line titles, inset status bar, focus ring.
+- **Step 7:** Backlog toolbar row, 36px rows (44px on a phone) with depth guides, "Clear filter".
+- **Step 8:** critique fixes, README, 0.7.0. Before/after screenshots: https://claude.ai/artifact/T6HDiZM1DzZ8N7WJ4uMqfH
+
+### Tested how
+
+- Gate (`lint`, `format:check`, `typecheck`, 140 tests, `build`), `cargo test`, `cargo clippy --all-targets -- -D warnings`: all pass.
+- The built binary against `http://kdev3:10050`, driven by headless Chromium: tree, details, legend, context menu, Kanban by status and stage, Backlog, at 1440×900 and 390×844 in dark and light, side by side with main's binary. Header heights measured; card click and Enter open the modal; Backlog filtering keeps parents; Clear filter resets text, Type and Stage.
+
+### Untested
+
+- iPhone Safari on a real device (safe areas, the switch, the bottom sheet).
+- Pan and zoom smoothness at 2,500 nodes: Home with Expand all and Show closed only reaches 316 nodes. Placement runs once per layout, zoom bucket or turn (counted), and costs 0.55 ms on a synthetic 2,500-glyph set.
+
+### Deviations
+
+- **Light colours:** besides the Overcast tokens, these light values were darkened to reach 4.5:1 on `--bg`, per the brief: `--in-progress`, `--p3`, `--t-idea` `#a8650a` → `#9c5e09`; `--done` → `#2e7c22`; `--dropped` → `#666c80`; `--focus` → `#8e6500`; `--next` → `#0a7a6a`; `--p2` → `#b14f10`; `--p4`, `--t-chore` → `#646b86`; `--stage-in-review` → `#99430c`. The contrast test checks light status and priority colours at 4.5 and dark ones at 3.
+- **Tree fit (Brandon's call on 2026-11-24):** keeping every leaf label inside the viewport gave a tree with no leaf labels. Now outward labels are capped at 18 characters below 1× zoom; the fit searches for the largest zoom where the shown labels fit, else fits the rings and zooms in until the outer ring's labels show, centred on nodes plus labels. On a phone some labels still run past the edges (5 left, 1 right on Home).
+- **Area labels:** depth 0 and 1 labels always show (Brandon's call); collisions hide only deeper labels.
+- **Depth numbers** sit 22px counter-clockwise of the top of each ring and step further round if a glyph is there.
+- **Copy:** "Expand branch (N beneath)" is now "Expand (N beneath)" so the panel actions fit on one row. The Backlog empty text kept its existing copy and gained the Clear filter button. The legend toggle always reads "Legend" with a chevron.
+- **Header:** the tree page's Backlog button and the Kanban/Backlog cross-links moved into the view switch. On Backlog, "Show closed" stays in the header actions; on Kanban and Backlog the server chip sits after the breadcrumb.
+- **Removed accessory:** the phone sheet's grab bar (the sheet cannot be dragged).
+- **Step 8 fixes:** the Kanban column bar became a 3px coloured `border-top` (the pseudo-element bar was invisible at the corners); card ids use Martian Mono at width 87.5% so the meta row fits in 17rem columns; the phone Backlog toolbar puts the filter on its own row with the other controls scrolling below.
+
+### Follow-ups
+
+- Header Tab order follows the DOM (place, actions, view switch), which differs from the desktop visual order (place, view switch, actions).
+- The refresh caption is hidden on a phone, so its `aria-live` announcement is lost there.
+- `fit` in `Graph.tsx` is long; its search could become a pure, tested helper.
