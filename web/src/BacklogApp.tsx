@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type CSSProperties,
   type ReactElement,
   type ReactNode,
 } from "react";
@@ -100,7 +101,14 @@ export function BacklogApp({ server, rootId }: Props): ReactElement {
       </Message>
     );
   } else if (rows.length === 0) {
-    body = <Message title="No matches">Nothing here matches the current filters.</Message>;
+    body = (
+      <Message title="No matches">
+        Nothing here matches the current filters.
+        <button type="button" className="btn" onClick={() => setFilter(NO_FILTER)}>
+          Clear filter
+        </button>
+      </Message>
+    );
   } else {
     body = (
       <ol className="backlog" aria-label="Backlog">
@@ -164,7 +172,7 @@ export function BacklogApp({ server, rootId }: Props): ReactElement {
         }}
       />
       <div className="toolbar">
-        <label className="filter">
+        <label className="filter filter-text">
           <span className="sr-only">Filter</span>
           <input
             type="search"
@@ -264,7 +272,7 @@ function BacklogRow({
     <div
       className={`row ${n.deferred ? "deferred" : ""}`}
       data-status={n.status}
-      style={{ paddingLeft: `${row.depth * 1.25 + 0.4}rem` }}
+      style={{ paddingLeft: `${row.depth * 1.25 + 0.4}rem`, "--depth": row.depth } as CSSProperties}
     >
       {canToggle ? (
         <button

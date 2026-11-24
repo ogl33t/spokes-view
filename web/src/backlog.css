@@ -1,13 +1,35 @@
 /* ---- backlog list ---- */
-.filter input {
-  font: inherit;
-  color: var(--text);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.3rem 0.55rem;
-  width: 16rem;
-  max-width: 100%;
+/* filter toolbar: its own grid row under the header, outside the scrolling main area */
+.toolbar {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.toolbar .filter {
+  display: block;
+  flex: none;
+}
+.toolbar .filter-text {
+  flex: 1 1 14rem;
+  max-width: 28rem;
+  min-width: 8rem;
+}
+.toolbar .filter-text input {
+  width: 100%;
+}
+.toolbar .btn {
+  flex: none;
+  white-space: nowrap;
+}
+.message .btn {
+  display: flex;
+  margin-top: var(--sp-3);
 }
 .backlog {
   list-style: none;
@@ -15,13 +37,24 @@
   padding: 0.6rem 1rem 1.5rem;
 }
 .backlog .row {
+  --indent: 1.25rem;
   --row-accent: var(--open);
   display: flex;
   align-items: center;
   gap: 0.2rem;
+  box-sizing: border-box;
+  height: var(--ctl-h);
   border-bottom: 1px solid var(--line);
   border-left: 3px solid var(--row-accent);
-  min-height: 2.1rem;
+  /* one 1px guide per indent level, drawn from --depth */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--rim) 0 1px,
+    transparent 1px var(--indent)
+  );
+  background-size: calc(var(--depth) * var(--indent)) 100%;
+  background-position: 0.4rem 0;
+  background-repeat: no-repeat;
 }
 .backlog .row[data-status="in_progress"] {
   --row-accent: var(--in-progress);
@@ -67,13 +100,14 @@
   color: inherit;
   font: inherit;
   text-align: left;
-  padding: 0.3rem 0.4rem;
-  border-radius: 5px;
+  align-self: stretch;
+  padding: 0 0.4rem;
+  border-radius: var(--r-ctl);
   cursor: pointer;
 }
 .backlog .row-main:hover,
 .backlog .row-main:focus-visible {
-  background: var(--bg-3);
+  background: var(--bg-hover);
 }
 .backlog .row-title {
   flex: 1;
@@ -87,13 +121,24 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.8rem;
+  justify-content: flex-end;
+  font-size: var(--fs-xs);
+}
+.backlog .row-meta .mono {
+  font-family: var(--font-mono);
 }
 
 @media (max-width: 760px) {
-  .filter,
-  .filter input {
-    width: 100%;
+  .toolbar {
+    padding: var(--sp-1) var(--sp-2);
+    overflow-x: auto;
+  }
+  .toolbar .filter-text {
+    flex: 0 0 100%;
+    max-width: none;
+  }
+  .toolbar {
+    flex-wrap: nowrap;
   }
   .backlog {
     padding: 0.4rem 0.4rem 1.5rem;

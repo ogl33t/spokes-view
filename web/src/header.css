@@ -151,16 +151,6 @@
 .app.backlog-app .main {
   grid-row: 4;
 }
-.toolbar {
-  grid-row: 2;
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-4);
-  border-bottom: 1px solid var(--line);
-}
 
 /* ---- phone: row 1 hub + view switch + refresh, row 2 scrolling place and actions ---- */
 @media (max-width: 760px) {
