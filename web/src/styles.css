@@ -35,46 +35,66 @@
   --stage-in-progress: #e0af68;
   --stage-in-review: #ff9e64;
   --stage-done: #9ece6a;
+  --bg-hover: #292e42;
+  --rim: #3b4261;
+
+  --font-ui:
+    "Atkinson Hyperlegible Next Variable", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Noto Sans", sans-serif;
+  --font-mono: "Martian Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-xs: 12px;
+  --fs-sm: 13.5px;
+  --fs-md: 16px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --r-ctl: 6px;
+  --r-surface: 10px;
+  --r-sheet: 14px;
+  --lift: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+  --ctl-h: 36px;
 
   color-scheme: dark;
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    "Noto Sans",
-    sans-serif;
-  font-size: 16px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
   line-height: 1.45;
   color: var(--text);
   background: var(--bg);
 }
 
 @media (prefers-color-scheme: light) {
+  /* "Overcast": every status, priority, type and stage colour is >= 4.5:1 on --bg. */
   :root {
-    --bg: #f6f7fb;
-    --bg-2: #ffffff;
-    --bg-3: #e9ecf5;
-    --line: #cfd4e3;
-    --text: #1d2130;
-    --muted: #535b75;
-    --accent: #2f5fd0;
+    --bg: #eceef4;
+    --bg-2: #fafbfd;
+    --bg-3: #e0e4ee;
+    --bg-hover: #d6dbe8;
+    --line: #c6ccdb;
+    --rim: #b9c0d3;
+    --text: #1f2335;
+    --muted: #535a7a;
+    --accent: #3451b2;
     --open: #2f62d6;
-    --in-progress: #a8650a;
+    --in-progress: #9c5e09;
     --waiting: #7b4fd1;
-    --done: #2f7d22;
-    --dropped: #7a8199;
+    --done: #2e7c22;
+    --dropped: #666c80;
     --alert: #c4213d;
-    --focus: #a87800;
-    --next: #0b8a78;
+    --focus: #8e6500;
+    --next: #0a7a6a;
     --p1: #c4213d;
-    --p2: #c85a12;
-    --p3: #a8650a;
-    --p4: #6b7390;
+    --p2: #b14f10;
+    --p3: #9c5e09;
+    --p4: #646b86;
     --t-bug: #c4213d;
     --t-feature: #2f5fd0;
-    --t-chore: #6b7390;
-    --t-idea: #a8650a;
+    --t-chore: #646b86;
+    --t-idea: #9c5e09;
     --t-epic: #7b4fd1;
     --stage-idea: #545b76;
     --stage-backlog: #474f6b;
@@ -82,8 +102,9 @@
     --stage-understood: #086456;
     --stage-planned: #6a3fc0;
     --stage-in-progress: #824d06;
-    --stage-in-review: #9a440c;
+    --stage-in-review: #99430c;
     --stage-done: #26681b;
+    --lift: 0 1px 2px rgb(31 35 53 / 0.08), 0 8px 24px rgb(31 35 53 / 0.14);
     color-scheme: light;
   }
 }
@@ -165,31 +186,149 @@ input {
     );
 }
 .picker select {
-  background: var(--bg-3);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.3rem 0.5rem;
   min-width: 10rem;
 }
 .check {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: var(--sp-2);
+  min-height: var(--ctl-h);
   cursor: pointer;
 }
-.btn {
+
+/* ---- base controls: every one is at least --ctl-h tall ---- */
+.btn,
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: var(--ctl-h);
   background: var(--bg-3);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.3rem 0.75rem;
+  border-radius: var(--r-ctl);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
 }
-.btn:hover:not(:disabled) {
+.btn {
+  padding: 0 var(--sp-3);
+}
+.icon-btn {
+  width: var(--ctl-h);
+  padding: 0;
+  flex: none;
+}
+.icon-btn svg {
+  display: block;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.btn:hover:not(:disabled),
+.icon-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--rim);
+}
+.btn.primary {
+  background: var(--accent);
   border-color: var(--accent);
+  color: var(--bg);
 }
-.btn:disabled {
+.btn.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, var(--text));
+  border-color: color-mix(in srgb, var(--accent) 88%, var(--text));
+}
+.btn:disabled,
+.icon-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+select,
+input[type="search"],
+input[type="text"] {
+  min-height: var(--ctl-h);
+  background-color: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  font-size: var(--fs-sm);
+  padding: 0 var(--sp-3);
+}
+select {
+  appearance: none;
+  padding-right: calc(var(--sp-3) + 1.1rem);
+  /* chevron from two gradients in the text colour, so it follows the theme */
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    right calc(var(--sp-3) + 5px) center,
+    right var(--sp-3) center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+select:hover,
+input[type="search"]:hover,
+input[type="text"]:hover {
+  border-color: var(--rim);
+}
+
+/* A native checkbox drawn as a toggle; markup adds role="switch". */
+.switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 2.25rem;
+  height: 1.25rem;
+  margin: 0;
+  border: 1px solid var(--rim);
+  border-radius: 999px;
+  background: var(--bg-3);
+  cursor: pointer;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+}
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(1.25rem - 6px);
+  height: calc(1.25rem - 6px);
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.12s;
+}
+.switch:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.switch:checked::before {
+  background: var(--bg-2);
+  transform: translateX(1rem);
+}
+.switch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.switch:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .icon-btn,
+  .switch,
+  .switch::before {
+    transition: none;
+  }
 }
 .updated {
   color: var(--muted);
@@ -246,15 +385,25 @@ input {
 }
 
 .mono {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
   color: var(--text);
 }
-.tag {
-  margin-left: 0.4rem;
-  padding: 0 0.4rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
+
+/* ---- chips: small body text on a tint of their colour ---- */
+.tag,
+.chip,
+.type-chip,
+.stage-chip,
+.prio-chip {
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
   font-weight: 600;
+  border-radius: 999px;
+}
+.tag {
+  margin-left: var(--sp-1);
+  padding: 0 var(--sp-2);
 }
 .tag.alert {
   background: var(--alert);
@@ -264,55 +413,43 @@ input {
   background: var(--in-progress);
   color: var(--bg);
 }
+/* The tint follows currentColor so marker classes (.m-*) that only set a colour tint too. */
 .chip {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0 0.55rem;
-  font-size: 0.8rem;
-}
-.prio-chip {
-  font-weight: 700;
+  --chip: var(--muted);
+  color: var(--chip);
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  background: color-mix(in srgb, currentColor 14%, var(--bg-2));
+  padding: 0 var(--sp-2);
 }
 .prio-chip.p1 {
-  color: var(--p1);
-  border-color: var(--p1);
+  --chip: var(--p1);
 }
 .prio-chip.p2 {
-  color: var(--p2);
-  border-color: var(--p2);
+  --chip: var(--p2);
 }
 .prio-chip.p3 {
-  color: var(--p3);
-  border-color: var(--p3);
+  --chip: var(--p3);
 }
 .prio-chip.p4 {
-  color: var(--p4);
+  --chip: var(--p4);
 }
 .type-chip.t-bug {
-  color: var(--t-bug);
-  border-color: var(--t-bug);
+  --chip: var(--t-bug);
 }
 .type-chip.t-feature {
-  color: var(--t-feature);
-  border-color: var(--t-feature);
+  --chip: var(--t-feature);
 }
 .type-chip.t-chore {
-  color: var(--t-chore);
-  border-color: var(--t-chore);
+  --chip: var(--t-chore);
 }
 .type-chip.t-idea {
-  color: var(--t-idea);
-  border-color: var(--t-idea);
+  --chip: var(--t-idea);
 }
 .type-chip.t-epic {
-  color: var(--t-epic);
-  border-color: var(--t-epic);
+  --chip: var(--t-epic);
 }
 .stage-chip {
-  color: var(--st, var(--muted));
-  border: 1px solid var(--st, var(--line));
-  background: color-mix(in srgb, var(--st, transparent) 16%, transparent);
-  border-radius: 999px;
+  --chip: var(--st, var(--muted));
 }
 .st-idea {
   --st: var(--stage-idea);
@@ -370,6 +507,9 @@ input {
   }
   .picker select {
     min-width: 7rem;
+  }
+  :root {
+    --ctl-h: 44px;
   }
   .updated {
     width: 100%;

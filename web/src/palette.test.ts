@@ -20,6 +20,9 @@ const themes: Record<string, string> = {
   light: css.slice(lightStart),
 };
 
+const STATUSES = ["open", "in-progress", "waiting", "done", "dropped", "alert", "focus", "next"];
+const PRIORITIES = ["p1", "p2", "p3", "p4"];
+
 type Rgb = [number, number, number];
 
 function variable(block: string, name: string): string {
@@ -71,4 +74,28 @@ describe("stage palette", () => {
     const values = STAGES.map((s) => variable(themes.dark ?? "", `stage-${s}`));
     expect(new Set(values).size).toBe(8);
   });
+});
+
+describe("base palette", () => {
+  for (const [theme, block] of Object.entries(themes)) {
+    describe(theme, () => {
+      for (const fg of ["text", "muted"]) {
+        for (const bg of ["bg", "bg-2"]) {
+          it(`--${fg} on --${bg} is readable (>= 4.5:1)`, () => {
+            const ratio = contrast(rgb(variable(block, fg)), rgb(variable(block, bg)));
+            expect(ratio).toBeGreaterThanOrEqual(4.5);
+          });
+        }
+      }
+
+      // Dark keeps its original graphics floor; light is held to the text bar.
+      const floor = theme === "light" ? 4.5 : 3;
+      for (const name of [...PRIORITIES, ...STATUSES]) {
+        it(`--${name} is visible on --bg (>= ${floor}:1)`, () => {
+          const ratio = contrast(rgb(variable(block, name)), rgb(variable(block, "bg")));
+          expect(ratio).toBeGreaterThanOrEqual(floor);
+        });
+      }
+    });
+  }
 });

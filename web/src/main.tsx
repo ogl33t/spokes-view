@@ -5,6 +5,8 @@ import { backlogRootFrom } from "./backlog";
 import { BacklogApp } from "./BacklogApp";
 import { kanbanRootFrom } from "./kanban";
 import { KanbanApp } from "./KanbanApp";
+import "@fontsource-variable/atkinson-hyperlegible-next/wght.css";
+import "@fontsource-variable/martian-mono/wdth.css";
 import "./styles.css";
 import "./graph.css";
 import "./panel.css";

@@ -112,6 +112,15 @@
 .prio.own {
   stroke-width: 2.2;
 }
+@media (prefers-color-scheme: light) {
+  .prio.inherited {
+    stroke-width: 0.9;
+    opacity: 0.4;
+  }
+  .prio.own {
+    stroke-width: 1.6;
+  }
+}
 .prio.p1 {
   stroke: var(--p1);
 }
