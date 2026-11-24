@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  backlogUrl,
   buildOutline,
   isFiltering,
   NO_FILTER,
@@ -25,6 +26,7 @@ import {
   STATUS_LABEL,
   TYPE_LABEL,
 } from "./format";
+import { AppBar } from "./AppBar";
 import { kanbanUrl } from "./kanban";
 import { NodeModal } from "./NodeModal";
 import { TypeStageChips } from "./TypeStageChips";
@@ -120,25 +122,48 @@ export function BacklogApp({ server, rootId }: Props): ReactElement {
 
   return (
     <div className="app kanban-app backlog-app">
-      <header className="bar">
-        <h1>
-          <span className="logo" aria-hidden="true" />
-          <a className="home" href={server ? `/?server=${encodeURIComponent(server)}` : "/"}>
-            Spokes view
-          </a>
-          <span className="muted">/</span>
-          <span className="board-title">
-            {data?.path.map((c) => c.title).join(" / ")}
-            {data && data.path.length > 0 ? " / " : ""}
-            <strong>{rootNode?.title ?? spokeId(rootId)}</strong>
-          </span>
-        </h1>
-        {server && <span className="chip">{server}</span>}
-        {server && (
-          <a className="btn" href={kanbanUrl(server, rootId)}>
-            Kanban
-          </a>
-        )}
+      <AppBar
+        view="backlog"
+        links={{
+          tree: server ? `/?server=${encodeURIComponent(server)}` : "/",
+          backlog: server ? backlogUrl(server, rootId) : "/",
+          kanban: server ? kanbanUrl(server, rootId) : null,
+        }}
+        place={
+          <>
+            <span className="board-title">
+              {data?.path.map((c) => c.title).join(" / ")}
+              {data && data.path.length > 0 ? " / " : ""}
+              <strong>{rootNode?.title ?? spokeId(rootId)}</strong>
+            </span>
+            {server && <span className="chip">{server}</span>}
+          </>
+        }
+        actions={
+          <label className="switch-label">
+            <input
+              type="checkbox"
+              role="switch"
+              className="switch"
+              checked={includeClosed}
+              onChange={toggleClosed}
+            />
+            Show closed
+          </label>
+        }
+        refresh={{
+          onClick: () => void refresh(),
+          busy: refreshing,
+          disabled: refreshing || !data,
+          caption:
+            (data
+              ? filtering
+                ? `${rows.length} of ${outline.length}`
+                : `${outline.length} items`
+              : "") + (checkedAt ? ` · checked ${clock(checkedAt)}` : ""),
+        }}
+      />
+      <div className="toolbar">
         <label className="filter">
           <span className="sr-only">Filter</span>
           <input
@@ -182,10 +207,6 @@ export function BacklogApp({ server, rootId }: Props): ReactElement {
             <option value="none">No stage</option>
           </select>
         </label>
-        <label className="check">
-          <input type="checkbox" checked={includeClosed} onChange={toggleClosed} />
-          Show closed
-        </label>
         <button
           type="button"
           className="btn"
@@ -197,19 +218,7 @@ export function BacklogApp({ server, rootId }: Props): ReactElement {
         <button type="button" className="btn" onClick={collapseAll} disabled={filtering || !data}>
           Collapse all
         </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => void refresh()}
-          disabled={refreshing || !data}
-        >
-          {refreshing ? "Refreshing…" : "Refresh"}
-        </button>
-        <span className="updated" aria-live="polite">
-          {data && (filtering ? `${rows.length} of ${outline.length}` : `${outline.length} items`)}
-          {checkedAt && ` · checked ${clock(checkedAt)}`}
-        </span>
-      </header>
+      </div>
       {(refreshError ?? data?.truncated) && (
         <div className={`notice ${refreshError ? "warn" : ""}`} role="status">
           {refreshError ??

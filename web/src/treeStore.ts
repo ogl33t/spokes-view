@@ -111,10 +111,16 @@ export function closeOthers(store: Store, expanded: ReadonlySet<number>, id: num
   return keep;
 }
 
+/** Nodes to open at first load: fewer on a phone, where the graph is smaller. */
+export function initialBudget(viewportWidth: number): number {
+  return viewportWidth < 600 ? 60 : 150;
+}
+
 /**
  * The expansion to start with on a server's first load: open levels from the root down
  * while the number of drawn nodes stays at or under `budget`.
  */
+
 export function initialExpansion(store: Store, budget = 150): Set<number> {
   const expanded = new Set<number>();
   if (!store.nodes.has(ROOT_ID)) return expanded;

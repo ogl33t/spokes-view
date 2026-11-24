@@ -4,6 +4,7 @@ import {
   buildStore,
   closeOthers,
   fullExpansion,
+  initialBudget,
   initialExpansion,
   knownChildren,
   missingChildren,
@@ -213,5 +214,16 @@ describe("closeOthers", () => {
     const input = new Set([2]);
     expect(closeOthers(store, input, 3).has(ROOT_ID)).toBe(true);
     expect([...input]).toEqual([2]);
+  });
+});
+
+describe("initialBudget", () => {
+  it("is smaller on a phone", () => {
+    expect(initialBudget(390)).toBe(60);
+    expect(initialBudget(599)).toBe(60);
+  });
+  it("is the full budget from 600px up", () => {
+    expect(initialBudget(600)).toBe(150);
+    expect(initialBudget(1440)).toBe(150);
   });
 });

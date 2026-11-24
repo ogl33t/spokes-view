@@ -8,6 +8,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import { AppBar } from "./AppBar";
 import { ApiError, fetchNode, fetchTree, listServers, type TreeQuery } from "./api";
 import { ContextMenu } from "./ContextMenu";
 import { DetailPanel, type DetailState } from "./DetailPanel";
@@ -22,6 +23,7 @@ import {
   buildStore,
   closeOthers,
   fullExpansion,
+  initialBudget,
   initialExpansion,
   knownChildren,
   needsFetch,
@@ -179,7 +181,9 @@ export function App(): ReactElement {
       for (const s of got) if (s) loaded.push(s);
       setSlices(loaded);
       if (!keep) {
-        setExpanded(initialExpansion(buildStore(loaded.map((s) => s.data))));
+        setExpanded(
+          initialExpansion(buildStore(loaded.map((s) => s.data)), initialBudget(window.innerWidth)),
+        );
         setFitKey((k) => k + 1);
       }
       setTree({ kind: "ready" });
@@ -483,72 +487,77 @@ export function App(): ReactElement {
 
   return (
     <div className={`app ${detail ? "with-panel" : ""}`}>
-      <header className="bar">
-        <h1>
-          <span className="logo" aria-hidden="true" />
-          Spokes view
-        </h1>
-        <label className="picker">
-          <span className="sr-only">Server</span>
-          <select
-            value={server ?? ""}
-            onChange={(e) => {
-              choose(e.target.value);
-            }}
-            disabled={!servers || servers.length === 0}
-          >
-            {(servers ?? []).map((s) => (
-              <option key={s.name} value={s.name}>
-                {s.name}
-                {s.status === "ok"
-                  ? s.version
-                    ? ` (${s.version})`
-                    : ""
-                  : ` (${s.status.replace("_", " ")})`}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={includeClosed} onChange={toggleClosed} />
-          Show closed
-        </label>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => void refresh()}
-          disabled={refreshing || tree.kind === "loading"}
-        >
-          {refreshing ? "Refreshing…" : "Refresh"}
-        </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => void expandAll()}
-          disabled={expandingAll || tree.kind !== "ready" || !root}
-        >
-          {expandingAll ? "Expanding…" : "Expand all"}
-        </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={collapseAll}
-          disabled={expandingAll || tree.kind !== "ready" || expanded.size <= 1}
-        >
-          Collapse all
-        </button>
-        {server && (
-          <a className="btn" href={backlogUrl(server, ROOT_ID)}>
-            Backlog
-          </a>
-        )}
-        <span className="updated" aria-live="polite">
-          {changedAt && `Updated ${clock(changedAt)}`}
-          {checkedAt && changedAt && checkedAt.getTime() !== changedAt.getTime()
-            ? ` · checked ${clock(checkedAt)}`
-            : ""}
-        </span>
-      </header>
+      <AppBar
+        view="tree"
+        links={{
+          tree: server ? `/?server=${encodeURIComponent(server)}` : "/",
+          backlog: server ? backlogUrl(server, ROOT_ID) : "/",
+          kanban: server ? kanbanUrl(server, ROOT_ID) : null,
+        }}
+        place={
+          <label className="picker">
+            <span className="sr-only">Server</span>
+            <select
+              value={server ?? ""}
+              onChange={(e) => {
+                choose(e.target.value);
+              }}
+              disabled={!servers || servers.length === 0}
+            >
+              {(servers ?? []).map((s) => (
+                <option key={s.name} value={s.name}>
+                  {s.name}
+                  {s.status === "ok"
+                    ? s.version
+                      ? ` (${s.version})`
+                      : ""
+                    : ` (${s.status.replace("_", " ")})`}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
+        actions={
+          <>
+            <label className="switch-label">
+              <input
+                type="checkbox"
+                role="switch"
+                className="switch"
+                checked={includeClosed}
+                onChange={toggleClosed}
+              />
+              Show closed
+            </label>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void expandAll()}
+              disabled={expandingAll || tree.kind !== "ready" || !root}
+            >
+              {expandingAll ? "Expanding…" : "Expand all"}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={collapseAll}
+              disabled={expandingAll || tree.kind !== "ready" || expanded.size <= 1}
+            >
+              Collapse all
+            </button>
+          </>
+        }
+        refresh={{
+          onClick: () => void refresh(),
+          busy: refreshing,
+          disabled: refreshing || tree.kind === "loading",
+          caption:
+            (changedAt ? `Updated ${clock(changedAt)}` : "") +
+            (checkedAt && changedAt && checkedAt.getTime() !== changedAt.getTime()
+              ? ` · checked ${clock(checkedAt)}`
+              : ""),
+        }}
+      />
       {(refreshError ?? expandNote ?? (store.truncated && tree.kind === "ready")) && (
         <div className={`notice ${refreshError ? "warn" : ""}`} role="status">
           {refreshError ??

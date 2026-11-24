@@ -1,0 +1,214 @@
+/* ---- shared header: brand, place, view switch, actions, refresh ---- */
+.bar {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+@media (min-width: 1024px) {
+  .bar {
+    flex-wrap: nowrap;
+  }
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: inherit;
+  text-decoration: none;
+  flex: none;
+  min-height: var(--ctl-h);
+}
+.brand:hover .wordmark {
+  text-decoration: underline;
+}
+.hub-mark {
+  flex: none;
+}
+.wordmark {
+  font-family: var(--font-mono);
+  font-stretch: 112.5%;
+  font-weight: 600;
+  font-size: var(--fs-md);
+  white-space: nowrap;
+}
+/* wraps place and actions so the phone layout can scroll them together */
+.bar-strip {
+  display: contents;
+}
+.brand {
+  order: 0;
+}
+.bar-place {
+  order: 1;
+}
+.view-switch {
+  order: 2;
+}
+.bar-actions {
+  order: 3;
+}
+.bar-refresh {
+  order: 4;
+}
+.bar-place {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.bar-place .board-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.picker select {
+  min-width: 10rem;
+}
+.view-switch {
+  display: flex;
+  flex: none;
+  padding: 2px;
+  gap: 2px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+}
+.view-switch a {
+  display: inline-flex;
+  align-items: center;
+  min-height: calc(var(--ctl-h) - 6px);
+  padding: 0 var(--sp-3);
+  border-radius: calc(var(--r-ctl) - 2px);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+.view-switch a:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.view-switch a[aria-current="page"] {
+  background: var(--accent);
+  color: var(--bg);
+}
+.bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  flex: none;
+}
+.switch-label,
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--ctl-h);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bar-refresh {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+}
+.updated {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.refresh.busy svg {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .refresh.busy svg {
+    animation: none;
+  }
+}
+
+/* the backlog filter toolbar sits in its own grid row under the header */
+.app.backlog-app {
+  grid-template-rows: auto auto auto 1fr;
+}
+.app.backlog-app .notice {
+  grid-row: 3;
+}
+.app.backlog-app .main {
+  grid-row: 4;
+}
+.toolbar {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---- phone: row 1 hub + view switch + refresh, row 2 scrolling place and actions ---- */
+@media (max-width: 760px) {
+  .bar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "brand switch refresh"
+      "strip strip strip";
+    align-items: center;
+    gap: 0 var(--sp-2);
+    padding: 2px var(--sp-2);
+  }
+  .brand {
+    grid-area: brand;
+  }
+  .wordmark {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .view-switch {
+    grid-area: switch;
+    justify-self: center;
+  }
+  .view-switch a {
+    padding: 0 var(--sp-2);
+  }
+  .bar-refresh {
+    grid-area: refresh;
+  }
+  .bar .updated {
+    display: none;
+  }
+  .bar-strip {
+    display: flex;
+    grid-area: strip;
+    align-items: center;
+    gap: var(--sp-3);
+    overflow-x: auto;
+    min-width: 0;
+  }
+  .bar-place {
+    flex: none;
+  }
+  .picker select {
+    min-width: 7rem;
+  }
+}

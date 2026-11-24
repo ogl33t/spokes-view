@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from "react";
+import { AppBar } from "./AppBar";
 import { backlogUrl } from "./backlog";
 import { clock, markers, spokeId } from "./format";
-import { buildBoard, GROUP_PARAM, groupingFrom, type Card, type Grouping } from "./kanban";
+import {
+  buildBoard,
+  GROUP_PARAM,
+  groupingFrom,
+  kanbanUrl,
+  type Card,
+  type Grouping,
+} from "./kanban";
 import { NodeModal } from "./NodeModal";
 import { TypeStageChips } from "./TypeStageChips";
 import { useSubtree } from "./useSubtree";
@@ -100,52 +108,55 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
 
   return (
     <div className="app kanban-app">
-      <header className="bar">
-        <h1>
-          <span className="logo" aria-hidden="true" />
-          <a className="home" href={server ? `/?server=${encodeURIComponent(server)}` : "/"}>
-            Spokes view
-          </a>
-          <span className="muted">/</span>
-          <span className="board-title">
-            {data?.path.map((c) => c.title).join(" / ")}
-            {data && data.path.length > 0 ? " / " : ""}
-            <strong>{rootNode?.title ?? spokeId(rootId)}</strong>
-          </span>
-        </h1>
-        {server && <span className="chip">{server}</span>}
-        {server && (
-          <a className="btn" href={backlogUrl(server, rootId)}>
-            Backlog
-          </a>
-        )}
-        <label>
-          <span className="sr-only">Group by</span>
-          <select
-            value={group}
-            onChange={(e) => changeGroup(groupingFrom(`?group=${e.target.value}`))}
-          >
-            <option value="status">Group by status</option>
-            <option value="stage">Group by stage</option>
-          </select>
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={includeClosed} onChange={toggleClosed} />
-          Show closed
-        </label>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => void refresh()}
-          disabled={refreshing || !data}
-        >
-          {refreshing ? "Refreshing…" : "Refresh"}
-        </button>
-        <span className="updated" aria-live="polite">
-          {data && `${total} items`}
-          {checkedAt && ` · checked ${clock(checkedAt)}`}
-        </span>
-      </header>
+      <AppBar
+        view="kanban"
+        links={{
+          tree: server ? `/?server=${encodeURIComponent(server)}` : "/",
+          backlog: server ? backlogUrl(server, rootId) : "/",
+          kanban: server ? kanbanUrl(server, rootId) : null,
+        }}
+        place={
+          <>
+            <span className="board-title">
+              {data?.path.map((c) => c.title).join(" / ")}
+              {data && data.path.length > 0 ? " / " : ""}
+              <strong>{rootNode?.title ?? spokeId(rootId)}</strong>
+            </span>
+            {server && <span className="chip">{server}</span>}
+          </>
+        }
+        actions={
+          <>
+            <label>
+              <span className="sr-only">Group by</span>
+              <select
+                value={group}
+                onChange={(e) => changeGroup(groupingFrom(`?group=${e.target.value}`))}
+              >
+                <option value="status">Group by status</option>
+                <option value="stage">Group by stage</option>
+              </select>
+            </label>
+            <label className="switch-label">
+              <input
+                type="checkbox"
+                role="switch"
+                className="switch"
+                checked={includeClosed}
+                onChange={toggleClosed}
+              />
+              Show closed
+            </label>
+          </>
+        }
+        refresh={{
+          onClick: () => void refresh(),
+          busy: refreshing,
+          disabled: refreshing || !data,
+          caption:
+            (data ? `${total} items` : "") + (checkedAt ? ` · checked ${clock(checkedAt)}` : ""),
+        }}
+      />
       {(refreshError ?? data?.truncated) && (
         <div className={`notice ${refreshError ? "warn" : ""}`} role="status">
           {refreshError ??
