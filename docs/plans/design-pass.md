@@ -1,7 +1,7 @@
 ---
-status: Planned
+status: In progress
 spoke: SPOKE-258
-started:
+started: 2026-11-24
 finished:
 summary: Put spokes-view through the frontend-design process. Tokyo Night stays as the dark palette. Type, light theme, controls, the views and the tree signature get a new identity, and the usability problems are fixed.
 ---

@@ -1,0 +1,250 @@
+/* ---- graph ---- */
+.graph,
+.graph-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.graph-svg {
+  transform-origin: 0 0;
+  will-change: transform;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.graph.dragging .graph-svg {
+  cursor: grabbing;
+}
+.rings circle {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 6;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.6;
+}
+.edges {
+  fill: none;
+  stroke: color-mix(in srgb, var(--muted) 45%, transparent);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+.edge-selected {
+  fill: none;
+  stroke: var(--focus);
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.node {
+  cursor: pointer;
+}
+.node:focus {
+  outline: none;
+}
+.node:focus-visible .shape {
+  stroke: var(--focus);
+  stroke-width: 3;
+}
+.node .shape {
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
+.node.k-area .shape {
+  stroke: color-mix(in srgb, var(--text) 55%, transparent);
+  stroke-width: 1.5;
+}
+.node.root .shape {
+  fill: var(--bg-3);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+.s-open {
+  fill: var(--open);
+  color: var(--open);
+}
+.s-in_progress {
+  fill: var(--in-progress);
+  color: var(--in-progress);
+}
+.s-waiting {
+  fill: var(--waiting);
+  color: var(--waiting);
+}
+.s-done {
+  fill: var(--done);
+  color: var(--done);
+}
+.s-dropped {
+  fill: var(--dropped);
+  color: var(--dropped);
+}
+.node.k-area.s-open .shape {
+  fill: color-mix(in srgb, var(--open) 55%, var(--bg-3));
+}
+.node.deferred,
+.legend-shape.deferred {
+  opacity: 0.5;
+}
+.node.s-dropped .label,
+.node.s-done .label {
+  fill: var(--muted);
+}
+.node.s-dropped .label {
+  text-decoration: line-through;
+}
+.node.is-next .shape {
+  stroke: var(--next);
+  stroke-width: 2.5;
+}
+
+.prio {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.prio.inherited {
+  stroke-dasharray: 2 2;
+  opacity: 0.55;
+  stroke-width: 1;
+}
+.prio.own {
+  stroke-width: 2.2;
+}
+.prio.p1 {
+  stroke: var(--p1);
+}
+.prio.p2 {
+  stroke: var(--p2);
+}
+.prio.p3 {
+  stroke: var(--p3);
+}
+.prio.p4 {
+  stroke: var(--p4);
+}
+.collapsed-halo,
+.legend-halo {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.2;
+  stroke-dasharray: 1.5 2.5;
+}
+.busy {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+  animation: spin 1s linear infinite;
+  transform-origin: 0 0;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .busy {
+    animation: none;
+  }
+}
+.alert-dot {
+  fill: var(--alert);
+  stroke: var(--bg);
+  stroke-width: 1;
+}
+.toggle .toggle-bg {
+  fill: var(--bg-3);
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+.toggle:hover .toggle-bg {
+  stroke: var(--focus);
+}
+.toggle-glyph {
+  stroke: var(--text);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.label {
+  fill: var(--text);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.inner-label {
+  text-anchor: middle;
+}
+.node.root .label {
+  font-weight: 650;
+}
+.node.k-area .label {
+  font-weight: 600;
+}
+.marker {
+  font-weight: 700;
+}
+.hidden-count {
+  fill: var(--muted);
+  font-weight: 600;
+}
+.m-next {
+  fill: var(--next);
+  color: var(--next);
+}
+.m-focus {
+  fill: var(--focus);
+  color: var(--focus);
+}
+.m-claimed {
+  fill: var(--in-progress);
+  color: var(--in-progress);
+}
+.m-alert {
+  fill: var(--alert);
+  color: var(--alert);
+}
+.m-waiting {
+  fill: var(--waiting);
+  color: var(--waiting);
+}
+.m-due {
+  fill: var(--in-progress);
+  color: var(--in-progress);
+}
+.m-muted {
+  fill: var(--muted);
+  color: var(--muted);
+}
+.selected-ring {
+  fill: none;
+  stroke: var(--focus);
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.zoom-buttons {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.zoom-buttons button {
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+.zoom-buttons button:hover {
+  border-color: var(--accent);
+}

@@ -1,0 +1,105 @@
+/* ---- backlog list ---- */
+.filter input {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  width: 16rem;
+  max-width: 100%;
+}
+.backlog {
+  list-style: none;
+  margin: 0;
+  padding: 0.6rem 1rem 1.5rem;
+}
+.backlog .row {
+  --row-accent: var(--open);
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid var(--row-accent);
+  min-height: 2.1rem;
+}
+.backlog .row[data-status="in_progress"] {
+  --row-accent: var(--in-progress);
+}
+.backlog .row[data-status="waiting"] {
+  --row-accent: var(--waiting);
+}
+.backlog .row[data-status="done"] {
+  --row-accent: var(--done);
+}
+.backlog .row[data-status="dropped"] {
+  --row-accent: var(--dropped);
+}
+.backlog .row[data-status="dropped"] .row-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.backlog .row.deferred {
+  opacity: 0.6;
+}
+.backlog .twisty {
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.backlog button.twisty:hover {
+  color: var(--text);
+}
+.backlog .row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0.3rem 0.4rem;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.backlog .row-main:hover,
+.backlog .row-main:focus-visible {
+  background: var(--bg-3);
+}
+.backlog .row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.backlog .row-meta {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 760px) {
+  .filter,
+  .filter input {
+    width: 100%;
+  }
+  .backlog {
+    padding: 0.4rem 0.4rem 1.5rem;
+  }
+  .backlog .row-meta .mono,
+  .backlog .row-meta .muted {
+    display: none;
+  }
+}

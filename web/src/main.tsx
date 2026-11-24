@@ -6,6 +6,10 @@ import { BacklogApp } from "./BacklogApp";
 import { kanbanRootFrom } from "./kanban";
 import { KanbanApp } from "./KanbanApp";
 import "./styles.css";
+import "./graph.css";
+import "./panel.css";
+import "./kanban.css";
+import "./backlog.css";
 
 const el = document.getElementById("root");
 if (!el) throw new Error("missing #root");
