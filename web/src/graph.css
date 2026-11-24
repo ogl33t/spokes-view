@@ -19,11 +19,18 @@
 }
 .rings circle {
   fill: none;
-  stroke: var(--line);
+  stroke: var(--rim);
   stroke-width: 1;
-  stroke-dasharray: 2 6;
   vector-effect: non-scaling-stroke;
-  opacity: 0.6;
+}
+.ring-depth {
+  font-family: var(--font-mono);
+  fill: var(--muted);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4px;
+  stroke-linejoin: round;
 }
 .edges {
   fill: none;
@@ -59,7 +66,13 @@
 .node.root .shape {
   fill: var(--bg-3);
   stroke: var(--accent);
-  stroke-width: 2.5;
+  stroke-width: 2;
+}
+.hub-nubs {
+  fill: none;
+  stroke: var(--rim);
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 .s-open {
   fill: var(--open);
@@ -178,6 +191,7 @@
 }
 
 .label {
+  font-family: var(--font-ui);
   fill: var(--text);
   paint-order: stroke;
   stroke: var(--bg);
@@ -189,7 +203,7 @@
   text-anchor: middle;
 }
 .node.root .label {
-  font-weight: 650;
+  font-weight: 700;
 }
 .node.k-area .label {
   font-weight: 600;
