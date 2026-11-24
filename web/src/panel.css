@@ -10,19 +10,40 @@
   align-items: flex-start;
 }
 .legend-body {
-  background: color-mix(in srgb, var(--bg-2) 94%, transparent);
+  background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-surface);
+  box-shadow: var(--lift);
   padding: 0.6rem 0.9rem;
   overflow: auto;
   max-width: 21rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
+}
+.legend-toggle .chev {
+  transition: transform 0.15s;
+  transform: rotate(180deg);
+}
+.legend.open .legend-toggle .chev {
+  transform: none;
+}
+.legend-nub {
+  fill: var(--muted);
+}
+.legend-rim {
+  fill: var(--bg-3);
+  stroke: var(--rim);
+  stroke-width: 1.5;
+}
+.legend-rim-n {
+  fill: var(--text);
+  font-family: var(--font-mono);
+  font-size: 8px;
 }
 .legend-body h4 {
   margin: 0.5rem 0 0.2rem;
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--muted);
 }
 .legend-body ul {
@@ -85,7 +106,8 @@
   line-height: 1;
 }
 .details h2 {
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
+  font-weight: 700;
   margin: 0.5rem 0 0.25rem;
   display: flex;
   gap: 0.5rem;
@@ -105,13 +127,17 @@
 .ids {
   margin: 0 0 0.6rem;
   color: var(--muted);
+  font-size: var(--fs-sm);
 }
 .fields {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 0.25rem 0.9rem;
   margin: 0.6rem 0;
-  font-size: 0.92rem;
+  font-size: var(--fs-sm);
+}
+.fields .mono {
+  font-size: var(--fs-xs);
 }
 .fields dt {
   color: var(--muted);
@@ -138,9 +164,9 @@
   gap: 0.3rem;
 }
 .details h3 {
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--muted);
   margin: 1.1rem 0 0.35rem;
 }
@@ -149,7 +175,7 @@
   word-break: break-word;
   font-family: inherit;
   background: var(--bg-3);
-  border-radius: 6px;
+  border-radius: var(--r-surface);
   padding: 0.6rem 0.75rem;
   margin: 0;
   font-size: 0.9rem;
@@ -188,8 +214,12 @@
 
 .actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-wrap: nowrap;
+  gap: var(--sp-1);
+}
+.actions .btn {
+  white-space: nowrap;
+  padding-inline: 0.6rem;
 }
 a.btn {
   color: inherit;
@@ -206,8 +236,8 @@ a.btn {
   list-style: none;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  border-radius: var(--r-surface);
+  box-shadow: var(--lift);
 }
 .context-menu .menu-head {
   padding: 0.25rem 0.6rem 0.35rem;
@@ -231,7 +261,7 @@ a.btn {
   text-align: left;
   background: none;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--r-ctl);
   padding: 0.35rem 0.6rem;
   cursor: pointer;
 }
@@ -239,7 +269,7 @@ a.btn {
 .context-menu button:focus-visible,
 .context-menu a:hover,
 .context-menu a:focus-visible {
-  background: var(--bg-3);
+  background: var(--bg-hover);
 }
 
 /* ---- modal ---- */
@@ -248,13 +278,19 @@ a.btn {
   max-height: calc(100vh - 4rem);
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-surface);
   background: var(--bg-2);
   color: var(--text);
-  box-shadow: 0 16px 48px rgb(0 0 0 / 45%);
+  box-shadow: var(--lift);
 }
 .modal::backdrop {
-  background: rgb(0 0 0 / 55%);
+  background: rgb(0 0 0 / 45%);
+  backdrop-filter: blur(2px);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .modal::backdrop {
+    backdrop-filter: none;
+  }
 }
 .modal-body {
   padding: 0.85rem 1.2rem 1.4rem;
@@ -269,10 +305,19 @@ a.btn {
     max-height: 58vh;
     border-left: none;
     border-top: 1px solid var(--line);
-    border-radius: 14px 14px 0 0;
-    box-shadow: 0 -8px 24px rgb(0 0 0 / 35%);
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+    box-shadow: var(--lift);
     z-index: 5;
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+  .panel::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 0 auto var(--sp-2);
+    border-radius: 2px;
+    background: var(--rim);
   }
   .legend-body {
     max-width: calc(100vw - 1.5rem);

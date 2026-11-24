@@ -67,7 +67,7 @@ export function DetailPanel(props: PanelProps): ReactElement {
           <ViewLinks server={server} node={n}>
             {n.child_count > 0 && (
               <button type="button" className="btn" onClick={() => onToggle(n.id)}>
-                {expanded ? "Collapse branch" : `Expand branch (${n.descendant_count} beneath)`}
+                {expanded ? "Collapse branch" : `Expand (${n.descendant_count} beneath)`}
               </button>
             )}
           </ViewLinks>
@@ -156,14 +156,14 @@ export function NodeDetails(props: DetailsProps): ReactElement {
             {n.is_step && !n.is_next && <Row label="Step">a step of an ordered parent</Row>}
             {n.due && (
               <Row label="Due">
-                {formatDate(n.due)}
+                <span className="mono">{formatDate(n.due)}</span>
                 {due === "overdue" && <span className="tag alert">overdue</span>}
                 {due === "today" && <span className="tag due">today</span>}
               </Row>
             )}
             {n.defer_until && (
               <Row label="Deferred until">
-                {formatDate(n.defer_until)}
+                <span className="mono">{formatDate(n.defer_until)}</span>
                 {!n.deferred && <span className="muted"> (no longer deferred)</span>}
               </Row>
             )}
@@ -177,17 +177,33 @@ export function NodeDetails(props: DetailsProps): ReactElement {
             {n.repeat && <Row label="Repeats">{n.repeat}</Row>}
             {n.progress && (
               <Row label="Progress">
-                {n.progress.done} of {n.progress.total} steps done
+                <span className="mono">
+                  {n.progress.done} of {n.progress.total}
+                </span>{" "}
+                steps done
               </Row>
             )}
             <Row label="Beneath">
-              {n.child_count} direct, {n.descendant_count} in all
-              {n.closed_child_count > 0 ? `, ${n.closed_child_count} closed children` : ""}
+              <span className="mono">{n.child_count}</span> direct,{" "}
+              <span className="mono">{n.descendant_count}</span> in all
+              {n.closed_child_count > 0 ? (
+                <>
+                  , <span className="mono">{n.closed_child_count}</span> closed children
+                </>
+              ) : (
+                ""
+              )}
             </Row>
             {n.unplanned && <Row label="Unplanned">no children and no notes yet</Row>}
-            <Row label="Created">{at(n.created_at)}</Row>
-            <Row label="Updated">{at(n.updated_at)}</Row>
-            <Row label="Touched">{at(n.touched_at)}</Row>
+            <Row label="Created">
+              <span className="mono">{at(n.created_at)}</span>
+            </Row>
+            <Row label="Updated">
+              <span className="mono">{at(n.updated_at)}</span>
+            </Row>
+            <Row label="Touched">
+              <span className="mono">{at(n.touched_at)}</span>
+            </Row>
           </dl>
           {markers(n, day).length > 0 && (
             <p className="marker-list">

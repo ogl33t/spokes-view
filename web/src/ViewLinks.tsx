@@ -23,10 +23,10 @@ export function ViewLinks({
       {node.child_count > 0 && (
         <>
           <a className="btn" href={backlogUrl(server, node.id)}>
-            View Backlog
+            Backlog
           </a>
           <a className="btn" href={kanbanUrl(server, node.id)}>
-            View Kanban
+            Kanban
           </a>
         </>
       )}

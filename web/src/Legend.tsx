@@ -15,7 +15,17 @@ export function Legend(): ReactElement {
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        {open ? "Hide legend" : "Legend"}
+        Legend
+        <svg className="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <path
+            d="M2.5 7.5 6 4l3.5 3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </button>
       {open && (
         <div className="legend-body">
@@ -76,6 +86,22 @@ export function Legend(): ReactElement {
                 <circle className="legend-shape s-open deferred" cx="8" cy="8" r="5" />
               </svg>
               faded: deferred
+            </li>
+          </ul>
+          <h4>Hub and rims</h4>
+          <ul>
+            <li>
+              <svg width="28" height="16" aria-hidden="true">
+                <circle className="legend-shape s-open" cx="7" cy="8" r="4" />
+                <circle className="legend-nub" cx="7" cy="2.5" r="1.4" />
+                <circle className="legend-nub" cx="12.5" cy="8" r="1.4" />
+                <circle className="legend-nub" cx="7" cy="13.5" r="1.4" />
+                <circle className="legend-rim" cx="21" cy="8" r="6" />
+                <text className="legend-rim-n" x="21" y="11" textAnchor="middle">
+                  1
+                </text>
+              </svg>
+              rim number = depth
             </li>
           </ul>
           <h4>Priority ring</h4>
