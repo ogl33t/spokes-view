@@ -82,7 +82,13 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
     body = (
       <div className="board">
         {board.map((col) => (
-          <section key={col.key} className="column" aria-label={col.label}>
+          <section
+            key={col.key}
+            className="column"
+            data-group={group}
+            data-key={col.key}
+            aria-label={col.label}
+          >
             <h2>
               {group === "status" && (
                 <span className={`status-dot s-${col.key}`} aria-hidden="true" />
@@ -91,15 +97,19 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
                 <span className={`stage-dot st-${col.key}`} aria-hidden="true" />
               )}
               {col.label}
-              <span className="count">{col.cards.length}</span>
+              <span className="count mono">{col.cards.length}</span>
             </h2>
-            <ol className="cards">
-              {col.cards.map((c) => (
-                <li key={c.node.id}>
-                  <KanbanCard card={c} today={today} onOpen={open} />
-                </li>
-              ))}
-            </ol>
+            {col.cards.length === 0 ? (
+              <div className="empty-slot">Nothing here</div>
+            ) : (
+              <ol className="cards">
+                {col.cards.map((c) => (
+                  <li key={c.node.id}>
+                    <KanbanCard card={c} today={today} onOpen={open} />
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
         ))}
       </div>

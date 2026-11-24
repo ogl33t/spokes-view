@@ -17,56 +17,126 @@
 .board {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(16rem, 1fr);
-  gap: 0.9rem;
-  padding: 0.9rem 1rem 1.5rem;
+  grid-auto-columns: minmax(17rem, 1fr);
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4) var(--sp-5);
   align-items: start;
   min-height: 100%;
 }
 .column {
+  --col-accent: var(--rim);
+  position: relative;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.6rem;
+  border-radius: var(--r-surface);
+  padding: 0 var(--sp-2) var(--sp-2);
   min-width: 0;
 }
+.column::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  height: 3px;
+  border-radius: var(--r-surface) var(--r-surface) 0 0;
+  background: var(--col-accent);
+}
+.column[data-group="status"][data-key="open"] {
+  --col-accent: var(--open);
+}
+.column[data-group="status"][data-key="in_progress"] {
+  --col-accent: var(--in-progress);
+}
+.column[data-group="status"][data-key="waiting"] {
+  --col-accent: var(--waiting);
+}
+.column[data-group="status"][data-key="done"] {
+  --col-accent: var(--done);
+}
+.column[data-group="status"][data-key="dropped"] {
+  --col-accent: var(--dropped);
+}
+.column[data-group="stage"][data-key="idea"] {
+  --col-accent: var(--stage-idea);
+}
+.column[data-group="stage"][data-key="backlog"] {
+  --col-accent: var(--stage-backlog);
+}
+.column[data-group="stage"][data-key="brainstormed"] {
+  --col-accent: var(--stage-brainstormed);
+}
+.column[data-group="stage"][data-key="understood"] {
+  --col-accent: var(--stage-understood);
+}
+.column[data-group="stage"][data-key="planned"] {
+  --col-accent: var(--stage-planned);
+}
+.column[data-group="stage"][data-key="in_progress"] {
+  --col-accent: var(--stage-in-progress);
+}
+.column[data-group="stage"][data-key="in_review"] {
+  --col-accent: var(--stage-in-review);
+}
+.column[data-group="stage"][data-key="done"] {
+  --col-accent: var(--stage-done);
+}
 .column h2 {
-  font-size: 0.9rem;
-  margin: 0.1rem 0.2rem 0.6rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-2);
+  font-size: var(--fs-sm);
+  margin: 0 calc(-1 * var(--sp-2)) var(--sp-2);
+  padding: var(--sp-3) calc(var(--sp-2) + 0.2rem) var(--sp-2);
+  border-radius: var(--r-surface) var(--r-surface) 0 0;
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--sp-2);
   text-transform: capitalize;
 }
 .column .count {
   margin-left: auto;
   color: var(--muted);
   font-weight: 500;
-  font-size: 0.8rem;
+}
+.empty-slot {
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--rim);
+  border-radius: var(--r-ctl);
+  color: var(--muted);
+  font-size: var(--fs-sm);
 }
 .cards {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 .card {
   --card-accent: var(--open);
   display: grid;
-  gap: 0.2rem;
+  gap: var(--sp-1);
   width: 100%;
   text-align: left;
+  font: inherit;
+  color: var(--text);
   background: var(--bg-3);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--card-accent);
-  border-radius: 7px;
-  padding: 0.5rem 0.65rem;
+  border-radius: var(--r-ctl);
+  box-shadow: inset 3px 0 0 var(--card-accent);
+  padding: var(--sp-2) var(--sp-3) var(--sp-2) calc(var(--sp-3) + 3px);
   cursor: pointer;
 }
 .card:hover {
-  border-color: var(--accent);
-  border-left-color: var(--card-accent);
+  background: var(--bg-hover);
+}
+.card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .card[data-status="in_progress"] {
   --card-accent: var(--in-progress);
@@ -88,22 +158,27 @@
   opacity: 0.6;
 }
 .card-path {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .card-title {
-  font-weight: 550;
+  font-weight: 600;
   word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }
 .card-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem 0.45rem;
-  font-size: 0.78rem;
+  gap: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 
@@ -111,6 +186,10 @@
   .board {
     grid-auto-flow: row;
     grid-auto-columns: auto;
-    padding: 0.6rem;
+    padding: var(--sp-2);
   }
+}
+
+.card-meta .mono {
+  color: var(--muted);
 }
