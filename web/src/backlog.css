@@ -27,6 +27,10 @@
   flex: none;
   white-space: nowrap;
 }
+/* the controls after the filter: inline on desktop, their own scrolling row on a phone */
+.toolbar-rest {
+  display: contents;
+}
 .message .btn {
   display: flex;
   margin-top: var(--sp-3);
@@ -130,15 +134,20 @@
 
 @media (max-width: 760px) {
   .toolbar {
+    flex-wrap: wrap;
+    gap: var(--sp-1);
     padding: var(--sp-1) var(--sp-2);
-    overflow-x: auto;
   }
   .toolbar .filter-text {
     flex: 0 0 100%;
     max-width: none;
   }
-  .toolbar {
-    flex-wrap: nowrap;
+  .toolbar-rest {
+    display: flex;
+    flex: 0 0 100%;
+    gap: var(--sp-2);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .backlog {
     padding: 0.4rem 0.4rem 1.5rem;

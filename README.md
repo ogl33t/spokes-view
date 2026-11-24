@@ -10,7 +10,7 @@ The finished product:
 
 - **Pick a server** from a configured list (home, dev, test copies) and see its tree; the choice is remembered and can be linked to.
 - **Radial graph:** the root in the centre, areas and tasks radiating outward, drawn so a tree of tens of thousands of nodes stays usable: only the top levels load at first, branches load when opened, collapsed branches show how much is hidden.
-- **Everything at a glance:** status colours, areas apart from tasks, priority rings, markers for claims, stalled claims, questions waiting on the user, due and overdue dates, the focus list, deferrals, repeats, notes, type and stage badges (types show an icon, stages have their own colours, and the Legend lists both; Spokes 0.4.0+; older servers show none) and the actionable next step of an ordered parent.
+- **Everything at a glance:** status colours, areas apart from tasks, priority rings, markers for claims, stalled claims, questions waiting on the user, due and overdue dates, the focus list, deferrals, repeats, notes, type and stage badges (types show an icon, stages have their own colours, and the Legend lists both; Spokes 0.4.0+; older servers show none) and the actionable next step of an ordered parent. The root is drawn as a hub with one nub per child, and each ring is a rim carrying its depth number (rim number = depth).
 - **Details on click:** breadcrumb, every field in readable form (dates in the server's time zone), type and stage (Spokes 0.4.0+), notes and recent events.
 - **Focus on click:** clicking a node also turns the whole tree so that node's spoke (and its label) lies horizontal, glides it to the centre and zooms in (to at least 1×, at most 2×). Drag, scroll or a zoom button stops it part-way; **Fit to view** turns the tree back north-up. With reduced motion set, it jumps without animating.
 - **Kanban view:** right-click a node (or press the menu key, or use the link in its details) and pick **View Kanban** to see every node beneath it on a board, one column per status (`/?server=<name>&kanban=<id>`). **Group by** switches the columns to stage, plus a No stage column (`&group=stage`). Cards show where they sit below the board's root; clicking one opens its details in a modal.
@@ -37,6 +37,7 @@ browser --(page, /api/servers/{name}/...)--> spokes-view --(GET /api/tree, /api/
 ```
 
 - One Rust (axum, tokio) binary. The React front-end (`web/`) is built by Vite and embedded into the binary, so the image is one file.
+- Fonts are self-hosted and embedded with the rest of the front-end: Atkinson Hyperlegible Next for text and Martian Mono for ids, counts and times (both OFL, through Fontsource). Nothing is fetched from a third-party origin.
 - Browsers cannot call Spokes directly (Spokes refuses any request with an `Origin` header), so the backend calls it server to server. The browser only ever sends a server **name**; the URLs live in the configuration and never reach the browser, and the backend never fetches a URL the browser supplied.
 - No database and no state: everything comes from Spokes on demand.
 - **No auth.** Anyone who can reach the port can read every configured tree. Run it on the LAN or a private Tailscale network only.

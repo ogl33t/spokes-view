@@ -310,15 +310,6 @@ a.btn {
     z-index: 5;
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
   }
-  .panel::before {
-    content: "";
-    display: block;
-    width: 36px;
-    height: 4px;
-    margin: 0 auto var(--sp-2);
-    border-radius: 2px;
-    background: var(--rim);
-  }
   .legend-body {
     max-width: calc(100vw - 1.5rem);
   }

@@ -28,19 +28,10 @@
   position: relative;
   background: var(--bg-2);
   border: 1px solid var(--line);
+  border-top: 3px solid var(--col-accent);
   border-radius: var(--r-surface);
   padding: 0 var(--sp-2) var(--sp-2);
   min-width: 0;
-}
-.column::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: -1px;
-  right: -1px;
-  height: 3px;
-  border-radius: var(--r-surface) var(--r-surface) 0 0;
-  background: var(--col-accent);
 }
 .column[data-group="status"][data-key="open"] {
   --col-accent: var(--open);
@@ -192,4 +183,6 @@
 
 .card-meta .mono {
   color: var(--muted);
+  /* Martian Mono's narrow width keeps the id, chips and notes glyph on one line in 17rem columns */
+  font-stretch: 87.5%;
 }

@@ -181,51 +181,53 @@ export function BacklogApp({ server, rootId }: Props): ReactElement {
             onChange={(e) => setFilter((f) => ({ ...f, text: e.target.value }))}
           />
         </label>
-        <label className="filter">
-          <span className="sr-only">Type</span>
-          <select
-            value={filter.type}
-            onChange={(e) =>
-              setFilter((f) => ({ ...f, type: e.target.value as RowFilter["type"] }))
-            }
+        <div className="toolbar-rest">
+          <label className="filter">
+            <span className="sr-only">Type</span>
+            <select
+              value={filter.type}
+              onChange={(e) =>
+                setFilter((f) => ({ ...f, type: e.target.value as RowFilter["type"] }))
+              }
+            >
+              <option value="any">Any type</option>
+              {NODE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {TYPE_LABEL[t]}
+                </option>
+              ))}
+              <option value="none">No type</option>
+            </select>
+          </label>
+          <label className="filter">
+            <span className="sr-only">Stage</span>
+            <select
+              value={filter.stage}
+              onChange={(e) =>
+                setFilter((f) => ({ ...f, stage: e.target.value as RowFilter["stage"] }))
+              }
+            >
+              <option value="any">Any stage</option>
+              {STAGES.map((st) => (
+                <option key={st} value={st}>
+                  {STAGE_LABEL[st]}
+                </option>
+              ))}
+              <option value="none">No stage</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setCollapsed(new Set())}
+            disabled={collapsed.size === 0 || filtering}
           >
-            <option value="any">Any type</option>
-            {NODE_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {TYPE_LABEL[t]}
-              </option>
-            ))}
-            <option value="none">No type</option>
-          </select>
-        </label>
-        <label className="filter">
-          <span className="sr-only">Stage</span>
-          <select
-            value={filter.stage}
-            onChange={(e) =>
-              setFilter((f) => ({ ...f, stage: e.target.value as RowFilter["stage"] }))
-            }
-          >
-            <option value="any">Any stage</option>
-            {STAGES.map((st) => (
-              <option key={st} value={st}>
-                {STAGE_LABEL[st]}
-              </option>
-            ))}
-            <option value="none">No stage</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => setCollapsed(new Set())}
-          disabled={collapsed.size === 0 || filtering}
-        >
-          Expand all
-        </button>
-        <button type="button" className="btn" onClick={collapseAll} disabled={filtering || !data}>
-          Collapse all
-        </button>
+            Expand all
+          </button>
+          <button type="button" className="btn" onClick={collapseAll} disabled={filtering || !data}>
+            Collapse all
+          </button>
+        </div>
       </div>
       {(refreshError ?? data?.truncated) && (
         <div className={`notice ${refreshError ? "warn" : ""}`} role="status">
