@@ -1,8 +1,8 @@
 ---
-status: In progress
+status: Done
 spoke: SPOKE-258
 started: 2026-11-24
-finished:
+finished: 2026-11-24
 summary: First design pass (fonts, tokens, light theme, controls, label fit). Superseded by docs/plans/workbench.md (direction A, Workbench), which rebuilt the layout on top of it.
 ---
 

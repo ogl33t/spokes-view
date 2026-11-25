@@ -1,5 +1,5 @@
 ---
-status: In progress
+status: In review
 spoke: SPOKE-258
 started: 2026-11-24
 finished:
@@ -164,3 +164,31 @@ Not authorized: tags, other stacks, changes to Spokes itself, new npm dependenci
 - **Area colours vs status colours:** both come from Tokyo Night, so an area pill can share a hue with a status. Shape keeps them apart (pills vs dots).
 - **Phone drawer and sheet** need a real iPhone check (safe areas, scroll locking); headless Chromium only approximates it.
 - **PR size:** PR #6 grows further; reviewing commit by commit is the practical path.
+
+## What shipped (2026-11-24)
+
+All eight steps landed on `design-pass` (PR #6), one commit per step plus three follow-up fixes:
+
+| Step | Commit | Notes |
+|---|---|---|
+| 1 Helpers, area tokens, prefs | `e12e50a` | Light area colours are new (`#0b5f91`, `#6a3fc0`, `#086456`, `#99430c`, `#0a6f85`, `#4d6a14`); `--on-area` is `#12141c` dark, `#fafbfd` light. `slotAt(index)` added to `areas.ts`. |
+| 2 Tree without rings | `3666366` | Pills only at depth 1 (deeper `kind: "area"` nodes are parent rings). Pills counter-rotate to stay horizontal. |
+| 3 Details panel | `c58b7aa` | `branchProgress` exported and used by tree, Backlog, Kanban and panel. |
+| 4 Shell, sidebar, find | `74fec0d` | Sidebar takes an extra optional `serverName` (phone caption). Shell takes `sidebar: SidebarProps` and builds the phone chrome from it. |
+| 5 Tree page | `94e5b6a`, `353462f` | Unloaded `SPOKE-N` jump loads branches along `path` in a loop (not via `toggle`). |
+| 6 Backlog page | `b38ead1` | |
+| 7 Kanban page | `9253f36` | |
+| 8 Clean-up, docs | `4e89ee3`, `0fdedf1`, `f0cb824`, `2b1dc59` | `AppBar.tsx`, `NodeModal.tsx`, `header.css`, the old `.app` grid, modal CSS and dead legend CSS removed. README rewritten for the Workbench layout. |
+
+**Tested how:** the gate (lint, format:check, typecheck, 210 Vitest tests, build), `cargo test` (16 passed) and `cargo clippy --all-targets -- -D warnings`, all clean on `2b1dc59`. End to end against `http://kdev3:10050` with the debug binary and headless Chromium: every view at 1440×900 and 390×844, dark and light, no page errors; find by title and by an unloaded `SPOKE-258` select and glide; area click focuses and fades other branches, a second click clears; "Only what's next" on a fresh load draws 21 nodes (next steps and their parents) instead of the root alone; both switches survive a reload; Kanban card opens the panel by click and Enter; Stage toggle sets `group=stage`; Backlog filter keeps parents (183 → 10 rows for "design").
+
+**Untested:** a real iPhone (safe areas, drawer and sheet scroll locking, touch); Safari (the find shortcuts and drawer focus trap use `checkVisibility`, Safari 17.4+); a tree near the node cap with "Only what's next" on (the capped notice is wired but never triggered on kdev3); Clear filter in the browser (code unchanged).
+
+**Deviations:**
+- **"Only what's next" loads deeper** (Brandon's decision, 2026-11-24): with the switch on, the tree loads to depth 10 under the node cap, because next steps sit below the first depth-3 load. The plan only said to filter the layout.
+- **Phone fit:** fixed a mis-sized label estimate for nested areas; the wheel is centred, but on kdev3's tree the longest depth-2 labels still clip about 20–30px at the screen edges at the first fit (labels need ~445px in a 390px box).
+- **Contract props left optional:** `DetailPanel`'s `children` and `areaSlot` and Graph's four new props are optional, not required as the contract says, with safe defaults.
+- **Backlog and Kanban sidebars** show the server as a name chip (those pages never had a picker); the refresh caption keeps seconds.
+- **Kanban cards** keep the priority chip and markers; Stage grouping (nine columns) scrolls sideways.
+- **Panel:** Expand/Collapse sits on its own row under the actions; the stage chip is hidden when it repeats the status; crumbs wrap rather than truncate.
+- **Expand all / Collapse all** are hidden on the phone tree, as on the phone board.
