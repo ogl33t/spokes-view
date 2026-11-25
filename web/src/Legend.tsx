@@ -63,16 +63,45 @@ export function Legend(): ReactElement {
           <h4>Shapes</h4>
           <ul>
             <li>
-              <svg width="16" height="16" aria-hidden="true">
-                <rect className="legend-shape s-open" x="2" y="2" width="12" height="12" rx="3" />
+              <svg width="28" height="16" aria-hidden="true">
+                <rect
+                  className="legend-pill"
+                  x="1"
+                  y="2"
+                  width="26"
+                  height="12"
+                  rx="6"
+                  style={{ fill: "var(--area-1)" }}
+                />
               </svg>
-              area (never finishes)
+              area, in its colour (never finishes)
             </li>
             <li>
               <svg width="16" height="16" aria-hidden="true">
-                <circle className="legend-shape s-open" cx="8" cy="8" r="5" />
+                <circle className="legend-track" cx="8" cy="8" r="5.5" />
+                <circle
+                  className="legend-arc"
+                  cx="8"
+                  cy="8"
+                  r="5.5"
+                  transform="rotate(-90 8 8)"
+                  strokeDasharray="13 35"
+                />
               </svg>
-              task
+              has steps: the green arc is the share done
+            </li>
+            <li>
+              <svg width="16" height="16" aria-hidden="true">
+                <circle className="legend-shape s-open" cx="8" cy="8" r="4.5" />
+              </svg>
+              task, coloured by status
+            </li>
+            <li>
+              <svg width="16" height="16" aria-hidden="true">
+                <circle className="prio p1 own" cx="8" cy="8" r="6.5" />
+                <circle className="legend-shape s-open" cx="8" cy="8" r="3.5" />
+              </svg>
+              priority ring (levels below)
             </li>
             <li>
               <svg width="16" height="16" aria-hidden="true">
@@ -83,25 +112,9 @@ export function Legend(): ReactElement {
             </li>
             <li>
               <svg width="16" height="16" aria-hidden="true">
-                <circle className="legend-shape s-open deferred" cx="8" cy="8" r="5" />
+                <circle className="legend-shape s-open deferred" cx="8" cy="8" r="4.5" />
               </svg>
               faded: deferred
-            </li>
-          </ul>
-          <h4>Hub and rims</h4>
-          <ul>
-            <li>
-              <svg width="28" height="16" aria-hidden="true">
-                <circle className="legend-shape s-open" cx="7" cy="8" r="4" />
-                <circle className="legend-nub" cx="7" cy="2.5" r="1.4" />
-                <circle className="legend-nub" cx="12.5" cy="8" r="1.4" />
-                <circle className="legend-nub" cx="7" cy="13.5" r="1.4" />
-                <circle className="legend-rim" cx="21" cy="8" r="6" />
-                <text className="legend-rim-n" x="21" y="11" textAnchor="middle">
-                  1
-                </text>
-              </svg>
-              rim number = depth
             </li>
           </ul>
           <h4>Priority ring</h4>

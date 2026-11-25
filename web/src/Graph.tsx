@@ -5,7 +5,7 @@ import { clip, isAlert, markers, spokeId, STATUS_LABEL } from "./format";
 import { easeInOut, focusTarget, interpolateView, labelFlip, screenOf } from "./focus";
 import type { View } from "./focus";
 import type { Store } from "./treeStore";
-import { missingChildren, needsFetch } from "./treeStore";
+import { knownChildren, missingChildren, needsFetch } from "./treeStore";
 import type { ViewNode } from "./types";
 import { glyphScale, onScreenGrowth } from "./zoomScale";
 import { fitPadding, innerLabelRank, labelledBounds, labelWidth, placeInnerLabels } from "./labels";
@@ -15,12 +15,18 @@ const MIN_K = 0.01;
 const MAX_K = 4;
 /** Label font size on screen, px. */
 const FONT = 13.5;
-/** Ring depth number size on screen, px (--fs-xs). */
-const RING_FONT = 12;
-/** How far the depth numbers sit counter-clockwise of the top of their ring, px on screen. */
-const RING_NUDGE = 22;
-/** Length of a hub nub, layout units at glyph scale. */
-const NUB = 6;
+/** Zoom bucket from which a compact (phone) tree shows its leaves' labels. */
+const COMPACT_LABEL_K = 1.5;
+/** Width of an area pill beyond its label, in label font sizes. */
+const PILL_PAD = 1.8;
+/** Area pill labels are bold, so they run a little wider than the estimate. */
+const PILL_BOLD = 1.08;
+/** Number of area colours (`--area-1` … `--area-6`). */
+const AREA_COLOURS = 6;
+/** Radius of a parent's progress ring, layout units at glyph scale. */
+const PARENT_R = 8;
+/** Circumference of a parent's progress ring. */
+const PARENT_C = 2 * Math.PI * PARENT_R;
 /** How long a click-to-focus animation runs, ms. */
 const FOCUS_MS = 450;
 /** Zoom levels are bucketed so labels re-render only when the zoom moves a step. */
@@ -42,10 +48,24 @@ export interface GraphProps {
   onToggle: (id: number) => void;
   /** Right-click (or the menu key) on a node, at a point in viewport pixels. */
   onMenu: (id: number, x: number, y: number) => void;
+  /** Colour slot (1…6) of an area; null falls back to the area's place among the root's areas. */
+  areaSlotOf?: (id: number) => number | null;
+  /** A new `seq` glides the view to `id`, as a click on it does. */
+  focusRequest?: { id: number; seq: number } | null;
+  /** Fades everything outside this node's subtree. */
+  dimOutside?: number | null;
+  /** Phone: leaves' labels stay hidden until zoomed in. */
+  compact?: boolean;
 }
+
+const noAreaSlot = (): number | null => null;
 
 export function Graph(props: GraphProps): ReactElement {
   const { layout, store, expanded, loading, selected, fitKey, onSelect, onToggle, onMenu } = props;
+  const areaSlotOf = props.areaSlotOf ?? noAreaSlot;
+  const focusRequest = props.focusRequest ?? null;
+  const dimOutside = props.dimOutside ?? null;
+  const compact = props.compact ?? false;
   const svgRef = useRef<SVGSVGElement>(null);
   const viewportRef = useRef<SVGGElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -162,10 +182,11 @@ export function Graph(props: GraphProps): ReactElement {
       const grow = (onScreenGrowth(lod) * k) / lod;
       return (id: number) => {
         const p = layout.byId.get(id);
+        const n = store.nodes.get(id);
         if (!p) return 0;
         const m = labelMode(p, lod);
-        if (!m.show || !m.outward) return 0;
-        return outwardLabelPx(store.nodes.get(id), today, grow, outwardMaxChars(lod));
+        if (!m.show || !m.outward || leafLabelHidden(n, lod, compact)) return 0;
+        return outwardLabelPx(n, today, grow, outwardMaxChars(lod));
       };
     };
     const fitsAt = (k: number) => {
@@ -188,7 +209,12 @@ export function Graph(props: GraphProps): ReactElement {
       const z = bucket(k);
       return layout.nodes.some((p) => {
         const m = labelMode(p, z);
-        return p.depth === outer && m.show && m.outward;
+        return (
+          p.depth === outer &&
+          m.show &&
+          m.outward &&
+          !leafLabelHidden(store.nodes.get(p.id), z, compact)
+        );
       });
     };
     let k = lo;
@@ -226,7 +252,7 @@ export function Graph(props: GraphProps): ReactElement {
     // Fitting also turns the tree back north-up.
     view.current = { k, r: 0, x: w / 2 - cx * k, y: h / 2 - cy * k };
     apply(true);
-  }, [layout, store, apply, stopFocus]);
+  }, [layout, store, compact, apply, stopFocus]);
 
   // Click-to-focus: turn the tree so the node's label reads horizontally, glide the node
   // to the centre and zoom in. Frames use the composited fast path; the end commits.
@@ -268,6 +294,21 @@ export function Graph(props: GraphProps): ReactElement {
       fit();
     }
   }, [fitKey, layout, fit]);
+
+  // A focus request glides to its node once the node is in the layout (a jump may still be
+  // loading the branches that lead to it). Each `seq` is followed once.
+  const focusedSeq = useRef<number | null>(null);
+  useEffect(() => {
+    if (!focusRequest || focusedSeq.current === focusRequest.seq) return;
+    if (!layout.byId.has(focusRequest.id)) return;
+    focusedSeq.current = focusRequest.seq;
+    focusOn(focusRequest.id);
+  }, [focusRequest, layout, focusOn]);
+
+  // Area colours, keyed by content so a new `areaSlotOf` each render does not redraw the nodes.
+  const slotKey = areaSlotKey(layout, store, areaSlotOf);
+  const areaSlots = useMemo(() => parseAreaSlotKey(slotKey), [slotKey]);
+  const dim = useMemo(() => subtreeOf(layout, dimOutside), [layout, dimOutside]);
 
   // Wheel and pinch zoom, drag to pan. Listeners are native so wheel can preventDefault.
   useEffect(() => {
@@ -429,8 +470,7 @@ export function Graph(props: GraphProps): ReactElement {
         onKeyDown={onKeyDown}
       >
         <g ref={viewportRef}>
-          <Rings layout={layout} k={lod} turn={rot} />
-          <Edges layout={layout} />
+          <Edges layout={layout} dim={dim} />
           {selPath && <path className="edge-selected" d={selPath} />}
           <Nodes
             layout={layout}
@@ -439,15 +479,11 @@ export function Graph(props: GraphProps): ReactElement {
             loading={loading}
             k={lod}
             turn={rot}
+            areaSlots={areaSlots}
+            dim={dim}
+            compact={compact}
           />
-          {sel && (
-            <circle
-              className="selected-ring"
-              cx={sel.x}
-              cy={sel.y}
-              r={nodeRadius(store.nodes.get(sel.id), sel) + 7}
-            />
-          )}
+          {sel && <SelectedRing p={sel} store={store} expanded={expanded} k={lod} turn={rot} />}
         </g>
       </svg>
       <div className="zoom-buttons" role="group" aria-label="Zoom">
@@ -505,7 +541,8 @@ export function edgePath(p: NodePos, c: NodePos): string {
 
 /**
  * On-screen length, px, of a leaf's outward label at the outermost ring with its gap from
- * the node, as drawn at fit (a collapsed node shows its hidden count too).
+ * the node, as drawn at fit (a collapsed node shows its hidden count too). An area has no
+ * outward label: its pill, centred on the node, reaches half its width.
  */
 function outwardLabelPx(
   n: ViewNode | undefined,
@@ -515,10 +552,14 @@ function outwardLabelPx(
 ): number {
   if (!n) return 0;
   const hasKids = n.child_count > 0;
+  if (n.kind === "area") {
+    const chars = areaPillText(n, hasKids ? n.descendant_count : 0).length;
+    return pillWidth(chars, FONT * grow) / 2;
+  }
   let chars = clip(n.title, maxChars).length;
   for (const m of markers(n, today)) chars += 1 + m.glyph.length;
   if (hasKids) chars += ` +${n.descendant_count}`.length;
-  const r = n.kind === "area" ? 9 : 6;
+  const r = hasKids ? PARENT_R : LEAF_R;
   return (hasKids ? r + 20 : r + 6) + labelWidth(chars, FONT * grow);
 }
 
@@ -530,93 +571,179 @@ function outwardMaxChars(k: number): number {
   return k < 1 ? 18 : 36;
 }
 
-function nodeRadius(n: ViewNode | undefined, p: NodePos): number {
-  if (p.depth === 0) return 14;
-  if (n?.kind === "area") return 9;
-  return 6;
+/** Radius of the root's dot, layout units at glyph scale. */
+const ROOT_R = 6;
+/** Radius of a leaf's dot, layout units at glyph scale. */
+const LEAF_R = 4.5;
+
+/** Whether a node is drawn as a parent (progress ring): it has drawn or known children. */
+function isParent(n: ViewNode, p: NodePos, store: Store): boolean {
+  return n.child_count > 0 || p.childCount > 0 || knownChildren(store, n.id).length > 0;
 }
 
-interface RingsProps {
-  layout: Layout;
-  /** Zoom bucket: the depth numbers keep their size on screen. */
+/** An area drawn as a pill: a depth-1 node of kind area. */
+function isAreaPill(n: ViewNode | undefined, p: NodePos): boolean {
+  return p.depth === 1 && n?.kind === "area";
+}
+
+function nodeRadius(p: NodePos, parent: boolean): number {
+  if (p.depth === 0) return ROOT_R;
+  return parent ? PARENT_R : LEAF_R;
+}
+
+/**
+ * Share of a parent's children that are done: its own `progress` when the server gives one,
+ * else the done children in the store over all its children, open and closed; 0 when unknown.
+ */
+function progressOf(n: ViewNode, store: Store): number {
+  if (n.progress) return n.progress.total > 0 ? n.progress.done / n.progress.total : 0;
+  const total = n.child_count + n.closed_child_count;
+  if (total === 0) return 0;
+  let done = 0;
+  for (const id of knownChildren(store, n.id)) {
+    if (store.nodes.get(id)?.status === "done") done++;
+  }
+  return Math.min(1, done / total);
+}
+
+/** Text inside an area's pill: its title, and the count hidden beneath when collapsed. */
+function areaPillText(n: ViewNode, hidden: number): string {
+  return clip(n.title, 22) + (hidden > 0 ? ` +${hidden}` : "");
+}
+
+/** Width of a pill holding `chars` characters at font size `font` (same units). */
+function pillWidth(chars: number, font: number): number {
+  return labelWidth(chars, font * PILL_BOLD) + font * PILL_PAD;
+}
+
+/** Half width and half height of an area's pill, layout units, at label font size `font`. */
+function pillHalf(text: string, font: number): { hw: number; hh: number } {
+  return { hw: pillWidth(text.length, font) / 2, hh: font };
+}
+
+/** Area nodes whose collapse hides children, with the count shown in the pill. */
+function hiddenBeneath(n: ViewNode, p: NodePos, expanded: ReadonlySet<number>): number {
+  const isOpen = expanded.has(n.id) && p.childCount > 0;
+  return n.child_count > 0 && !isOpen ? n.descendant_count : 0;
+}
+
+/**
+ * Colour slots of the drawn areas as a string key ("id:slot,…"): `areaSlotOf` where it
+ * knows the area, else the area's place among the root's areas, cycling through the colours.
+ */
+function areaSlotKey(
+  layout: Layout,
+  store: Store,
+  areaSlotOf: (id: number) => number | null,
+): string {
+  const parts: string[] = [];
+  let index = 0;
+  for (const p of layout.nodes) {
+    if (!isAreaPill(store.nodes.get(p.id), p)) continue;
+    const slot = areaSlotOf(p.id) ?? (index % AREA_COLOURS) + 1;
+    index++;
+    parts.push(`${p.id}:${slot}`);
+  }
+  return parts.join(",");
+}
+
+function parseAreaSlotKey(key: string): ReadonlyMap<number, number> {
+  const slots = new Map<number, number>();
+  if (!key) return slots;
+  for (const part of key.split(",")) {
+    const [id, slot] = part.split(":").map(Number);
+    if (id !== undefined && slot !== undefined) slots.set(id, slot);
+  }
+  return slots;
+}
+
+/** Ids of `rootId` and everything drawn beneath it; null when there is nothing to dim. */
+function subtreeOf(layout: Layout, rootId: number | null): ReadonlySet<number> | null {
+  if (rootId === null || !layout.byId.has(rootId)) return null;
+  const kids = new Map<number, number[]>();
+  for (const p of layout.nodes) {
+    if (p.parent === null) continue;
+    const list = kids.get(p.parent);
+    if (list) list.push(p.id);
+    else kids.set(p.parent, [p.id]);
+  }
+  const inside = new Set<number>();
+  const stack = [rootId];
+  for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
+    inside.add(id);
+    stack.push(...(kids.get(id) ?? []));
+  }
+  return inside;
+}
+
+/** Whether a leaf's outward label waits for a closer zoom (compact trees, phones). */
+function leafLabelHidden(n: ViewNode | undefined, k: number, compact: boolean): boolean {
+  return compact && k < COMPACT_LABEL_K && n !== undefined && n.child_count === 0;
+}
+
+interface SelectedRingProps {
+  p: NodePos;
+  store: Store;
+  expanded: ReadonlySet<number>;
   k: number;
-  /** The tree's rotation, degrees: the numbers flip so they never read upside down. */
   turn: number;
 }
 
-/** Ring guides, each with its depth number at the top of the ring (it turns with the tree). */
-/**
- * Angle, radians, for a ring's depth number: `clear` counter-clockwise of the top, or
- * further round until it is at least `clear` from every node on the ring (`angles`).
- */
-function ringNumberAngle(angles: readonly number[], clear: number): number {
-  const tau = Math.PI * 2;
-  // Signed turn from `b` to `a`, in (-π, π].
-  const offset = (a: number, b: number) => {
-    const d = (((a - b) % tau) + tau) % tau;
-    return d > Math.PI ? d - tau : d;
-  };
-  let at = -clear;
-  // A crowded ring may have no gap near the top: give up after a few steps.
-  for (let i = 0; i < 64; i++) {
-    let next = at;
-    for (const a of angles) {
-      const s = offset(a, at);
-      if (Math.abs(s) < clear) next = Math.min(next, at + s - clear - 1e-6);
-    }
-    if (next === at) return at;
-    at = next;
+/** The ring around the selected node: a rounded box around an area's pill. */
+function SelectedRing({ p, store, expanded, k, turn }: SelectedRingProps): ReactElement | null {
+  const n = store.nodes.get(p.id);
+  if (!n) return null;
+  if (isAreaPill(n, p)) {
+    const font = (FONT * onScreenGrowth(k)) / k;
+    const { hw, hh } = pillHalf(areaPillText(n, hiddenBeneath(n, p, expanded)), font);
+    const pad = font * 0.4;
+    return (
+      <rect
+        className="selected-ring"
+        transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) rotate(${(-turn).toFixed(2)})`}
+        x={-hw - pad}
+        y={-hh - pad}
+        width={2 * (hw + pad)}
+        height={2 * (hh + pad)}
+        rx={hh + pad}
+      />
+    );
   }
-  return -clear;
+  return (
+    <circle
+      className="selected-ring"
+      cx={p.x}
+      cy={p.y}
+      r={nodeRadius(p, isParent(n, p, store)) + 7}
+    />
+  );
 }
 
-const Rings = memo(function Rings({ layout, k, turn }: RingsProps) {
-  const radii = layout.radii;
-  const font = (RING_FONT * onScreenGrowth(k)) / k;
-  const nudge = (RING_NUDGE * onScreenGrowth(k)) / k;
-  // The number runs along the ring, which at the top points the way a spoke at 90° does.
-  const flip = labelFlip(Math.PI / 2, turn);
-  // Just off the top, and clear of the nodes on the ring.
-  const angles = useMemo(() => {
-    const byDepth: number[][] = radii.map(() => []);
-    for (const p of layout.nodes) byDepth[p.depth]?.push(p.angle);
-    return byDepth;
-  }, [layout, radii]);
-  const at = (r: number, depth: number) =>
-    (ringNumberAngle(angles[depth] ?? [], nudge / r) * 180) / Math.PI;
-  return (
-    <g className="rings" aria-hidden="true">
-      {radii.slice(1).map((r, i) => (
-        <circle key={i} r={r} />
-      ))}
-      {radii.slice(1).map((r, i) => (
-        <text
-          key={i}
-          className="ring-depth"
-          transform={`rotate(${at(r, i + 1).toFixed(2)}) translate(0 ${(-r).toFixed(1)})${flip ? " rotate(180)" : ""}`}
-          dy="0.35em"
-          fontSize={font}
-        >
-          {i + 1}
-        </text>
-      ))}
-    </g>
-  );
-});
+interface EdgesProps {
+  layout: Layout;
+  /** The subtree that stays bright; edges into anything else fade. */
+  dim: ReadonlySet<number> | null;
+}
 
-const Edges = memo(function Edges({ layout }: { layout: Layout }) {
-  // One path for every edge: a few thousand segments cost one DOM node.
-  const d = useMemo(() => {
-    const parts: string[] = [];
+const Edges = memo(function Edges({ layout, dim }: EdgesProps) {
+  // Two paths for every edge (bright and faded): a few thousand segments cost two DOM nodes.
+  const { bright, faded } = useMemo(() => {
+    const on: string[] = [];
+    const off: string[] = [];
     for (const n of layout.nodes) {
       if (n.parent === null) continue;
       const p = layout.byId.get(n.parent);
       if (!p) continue;
-      parts.push(edgePath(p, n));
+      (dim && !dim.has(n.id) ? off : on).push(edgePath(p, n));
     }
-    return parts.join("");
-  }, [layout]);
-  return <path className="edges" d={d} aria-hidden="true" />;
+    return { bright: on.join(""), faded: off.join("") };
+  }, [layout, dim]);
+  return (
+    <>
+      <path className="edges" d={bright} aria-hidden="true" />
+      {faded && <path className="edges dim" d={faded} aria-hidden="true" />}
+    </>
+  );
 });
 
 interface NodesProps {
@@ -628,6 +755,12 @@ interface NodesProps {
   k: number;
   /** The tree's rotation, degrees: labels are turned to stay readable under it. */
   turn: number;
+  /** Colour slot of each drawn area. */
+  areaSlots: ReadonlyMap<number, number>;
+  /** The subtree that stays bright; every other node fades. */
+  dim: ReadonlySet<number> | null;
+  /** Phone: leaves' labels wait for a closer zoom. */
+  compact: boolean;
 }
 
 /** Characters in a label with its marker glyphs, for estimating its width. */
@@ -656,18 +789,29 @@ function innerLabelY(p: NodePos, r: number, z: number, font: number): number {
 /**
  * Which inner labels show at zoom bucket `k` and turn `turn` without colliding with each
  * other or with a node glyph. Boxes are in layout units, in the turned frame where inner
- * labels read horizontally.
+ * labels read horizontally. An area's pill is a glyph: it holds the area's label.
  */
-function placeInner(layout: Layout, store: Store, k: number, turn: number): Set<number> {
+function placeInner(
+  layout: Layout,
+  store: Store,
+  expanded: ReadonlySet<number>,
+  k: number,
+  turn: number,
+): Set<number> {
   const today = store.meta?.today ?? "";
   const font = (FONT * onScreenGrowth(k)) / k;
   const items: LabelBox[] = [];
   for (const p of layout.nodes) {
     const n = store.nodes.get(p.id);
     if (!n) continue;
-    const r = nodeRadius(n, p);
-    const z = glyphScale(k, p.room, r);
     const at = screenOf({ x: 0, y: 0, k: 1, r: turn }, p);
+    if (isAreaPill(n, p)) {
+      const { hw, hh } = pillHalf(areaPillText(n, hiddenBeneath(n, p, expanded)), font);
+      items.push({ id: p.id, x: at.x - hw, y: at.y - hh, width: 2 * hw, height: 2 * hh, rank: -1 });
+      continue;
+    }
+    const r = nodeRadius(p, isParent(n, p, store));
+    const z = glyphScale(k, p.room, r);
     const half = r * z;
     items.push({
       id: p.id,
@@ -689,47 +833,129 @@ function placeInner(layout: Layout, store: Store, k: number, turn: number): Set<
       width,
       height: font * 1.25,
       rank: innerLabelRank(p.depth, n.descendant_count),
-      // The hub's and the areas' labels always show.
+      // The hub's and depth-1 labels always show.
       fixed: p.depth <= 1,
     });
   }
   return placeInnerLabels(items);
 }
 
-const Nodes = memo(function Nodes({ layout, store, expanded, loading, k, turn }: NodesProps) {
+/** Point `d` layout units out along a spoke at `deg` degrees (0 = right). */
+function along(deg: number, d: number): string {
+  const a = (deg * Math.PI) / 180;
+  return `translate(${(Math.cos(a) * d).toFixed(1)} ${(Math.sin(a) * d).toFixed(1)})`;
+}
+
+/** The +/− badge that expands or collapses a node. */
+function Toggle({ at, open, scale }: { at: string; open: boolean; scale?: number }): ReactElement {
+  return (
+    <g
+      data-toggle="1"
+      className="toggle"
+      aria-hidden="true"
+      transform={scale === undefined ? at : `${at} scale(${scale.toFixed(3)})`}
+    >
+      <circle r={6} className="toggle-bg" />
+      <path className="toggle-glyph" d={open ? "M-3 0H3" : "M-3 0H3M0 -3V3"} />
+    </g>
+  );
+}
+
+interface AreaPillProps {
+  text: string;
+  slot: number;
+  font: number;
+  turn: number;
+  /** The spoke's direction, degrees (0 = right): the toggle sits beyond the pill along it. */
+  deg: number;
+  prio: number | null;
+  ownPrio: boolean;
+  collapsed: boolean;
+  busy: boolean;
+  alert: boolean;
+  /** Whether the area has children (shows the +/− badge), and whether it is open. */
+  toggle: { open: boolean } | null;
+}
+
+/**
+ * An area: a pill in its area colour with the label inside, reading horizontally whatever
+ * the turn. Its rings follow the pill's outline. Sizes follow the label font.
+ */
+function AreaPill(props: AreaPillProps): ReactElement {
+  const { text, slot, font, turn, deg, prio, ownPrio, collapsed, busy, alert, toggle } = props;
+  const { hw, hh } = pillHalf(text, font);
+  // Glyph sizes are drawn for a FONT-sized label.
+  const s = font / FONT;
+  const outline = (cls: string, grow: number) => (
+    <rect
+      className={cls}
+      x={-hw - grow}
+      y={-hh - grow}
+      width={2 * (hw + grow)}
+      height={2 * (hh + grow)}
+      rx={hh + grow}
+    />
+  );
+  // The toggle sits where the spoke leaves the pill, plus its own radius and a gap.
+  const a = ((deg + turn) * Math.PI) / 180;
+  const exit = Math.min(
+    Math.abs(Math.cos(a)) > 1e-6 ? hw / Math.abs(Math.cos(a)) : Infinity,
+    Math.abs(Math.sin(a)) > 1e-6 ? hh / Math.abs(Math.sin(a)) : Infinity,
+  );
+  return (
+    <>
+      <g transform={turn ? `rotate(${(-turn).toFixed(2)})` : undefined}>
+        {prio !== null && outline(`prio p${prio} ${ownPrio ? "own" : "inherited"}`, 3.5 * s)}
+        {collapsed && outline("collapsed-halo", (prio ? 7 : 4) * s)}
+        {busy && outline("busy pill-busy", 9 * s)}
+        <rect
+          className="shape area-pill"
+          x={-hw}
+          y={-hh}
+          width={2 * hw}
+          height={2 * hh}
+          rx={hh}
+          style={{ fill: `var(--area-${slot})` }}
+        />
+        <text className="area-label" dy="0.35em" fontSize={font}>
+          {text}
+        </text>
+        {alert && <circle className="alert-dot" cx={hw - hh * 0.4} cy={-hh * 0.8} r={3.2 * s} />}
+      </g>
+      {toggle && <Toggle at={along(deg, exit + 8 * s)} open={toggle.open} scale={s} />}
+    </>
+  );
+}
+
+const Nodes = memo(function Nodes(props: NodesProps) {
+  const { layout, store, expanded, loading, k, turn, areaSlots, dim, compact } = props;
   const today = store.meta?.today ?? "";
   // Labels keep the same size on screen when zoomed out and grow gently with glyphs past 1x.
   const grow = onScreenGrowth(k);
   const font = (FONT * grow) / k;
   // Runs only when the layout, store, zoom bucket or turn changes, never per frame.
-  const placed = useMemo(() => placeInner(layout, store, k, turn), [layout, store, k, turn]);
-  const root = layout.nodes[0];
-  const hubNubs = useMemo(() => {
-    if (!root) return "";
-    const r = nodeRadius(store.nodes.get(root.id), root);
-    let d = "";
-    for (const c of layout.nodes) {
-      if (c.parent !== root.id) continue;
-      const sx = Math.sin(c.angle);
-      const sy = -Math.cos(c.angle);
-      d += `M${(sx * (r + 1)).toFixed(2)} ${(sy * (r + 1)).toFixed(2)}L${(sx * (r + 1 + NUB)).toFixed(2)} ${(sy * (r + 1 + NUB)).toFixed(2)}`;
-    }
-    return d;
-  }, [layout, root, store]);
+  const placed = useMemo(
+    () => placeInner(layout, store, expanded, k, turn),
+    [layout, store, expanded, k, turn],
+  );
   return (
     <g className="nodes">
       {layout.nodes.map((p) => {
         const n = store.nodes.get(p.id);
         if (!n) return null;
-        const r = nodeRadius(n, p);
+        const parent = isParent(n, p, store);
+        const r = nodeRadius(p, parent);
         const hasKids = n.child_count > 0;
         const isOpen = expanded.has(n.id) && p.childCount > 0;
         const collapsed = hasKids && !isOpen;
         const busy = loading.has(n.id);
         const ms = markers(n, today);
+        const area = isAreaPill(n, p);
         const { show, outward } = labelMode(p, k);
         // Inner labels also give way to a higher-ranked label or a glyph they would cover.
-        const showLabel = show && (outward || placed.has(n.id));
+        // An area's label is in its pill; a compact tree keeps leaves unlabelled until close.
+        const showLabel =
+          !area && show && !leafLabelHidden(n, k, compact) && (outward || placed.has(n.id));
         const maxChars = p.depth === 0 ? 40 : outward ? outwardMaxChars(k) : 22;
         const missing = missingChildren(store, n.id);
         const hidden = collapsed ? n.descendant_count : 0;
@@ -744,7 +970,6 @@ const Nodes = memo(function Nodes({ layout, store, expanded, loading, k, turn }:
           .filter(Boolean)
           .join(", ");
         const prio = n.effective_priority;
-        const squareTurn = `rotate(${((p.angle * 180) / Math.PI).toFixed(2)})`;
         const ownPrio = n.priority !== null;
         const deg = (p.angle * 180) / Math.PI - 90;
         const flip = labelFlip(p.angle, turn);
@@ -754,14 +979,17 @@ const Nodes = memo(function Nodes({ layout, store, expanded, loading, k, turn }:
         // in step with the labels.
         const z = glyphScale(k, p.room, r);
         const offset = (hasKids ? r + 20 : r + 6) * z;
+        const progress = parent && !area && p.depth > 0 ? progressOf(n, store) : 0;
         const cls = [
           "node",
           `s-${n.status}`,
           `k-${n.kind}`,
           p.depth === 0 ? "root" : "",
+          parent ? "parent" : "leaf",
           n.deferred ? "deferred" : "",
           collapsed ? "collapsed" : "",
           n.is_next ? "is-next" : "",
+          dim && !dim.has(n.id) ? "dim" : "",
         ]
           .filter(Boolean)
           .join(" ");
@@ -777,47 +1005,51 @@ const Nodes = memo(function Nodes({ layout, store, expanded, loading, k, turn }:
             aria-expanded={hasKids ? isOpen : undefined}
           >
             <title>{`${spokeId(n.id)}  ${n.title}\n${describe}`}</title>
-            <g transform={Math.abs(z - 1) < 1e-3 ? undefined : `scale(${z.toFixed(3)})`}>
-              {prio !== null && p.depth > 0 && (
-                <circle className={`prio p${prio} ${ownPrio ? "own" : "inherited"}`} r={r + 3.5} />
-              )}
-              {collapsed && <circle className="collapsed-halo" r={r + (prio ? 7 : 4)} />}
-              {busy && <circle className="busy" r={r + 9} />}
-              {p.depth === 0 && hubNubs && <path className="hub-nubs" d={hubNubs} />}
-              {n.kind === "area" && p.depth > 0 ? (
-                <rect
-                  className="shape"
-                  x={-r}
-                  y={-r}
-                  width={r * 2}
-                  height={r * 2}
-                  rx={3}
-                  transform={squareTurn}
-                />
-              ) : (
-                <circle className="shape" r={r} />
-              )}
-              {isAlert(n, today) && (
-                <circle
-                  className="alert-dot"
-                  cx={r * 0.8}
-                  cy={-r * 0.8}
-                  r={3.2}
-                  transform={n.kind === "area" && p.depth > 0 ? squareTurn : undefined}
-                />
-              )}
-              {hasKids && p.depth > 0 && (
-                <g
-                  data-toggle="1"
-                  className="toggle"
-                  aria-hidden="true"
-                  transform={`translate(${(Math.cos((deg * Math.PI) / 180) * (r + 10)).toFixed(1)} ${(Math.sin((deg * Math.PI) / 180) * (r + 10)).toFixed(1)})`}
-                >
-                  <circle r={6} className="toggle-bg" />
-                  <path className="toggle-glyph" d={isOpen ? "M-3 0H3" : "M-3 0H3M0 -3V3"} />
-                </g>
-              )}
-            </g>
+            {area ? (
+              <AreaPill
+                text={areaPillText(n, hidden)}
+                slot={areaSlots.get(n.id) ?? 1}
+                font={font}
+                turn={turn}
+                deg={deg}
+                prio={prio}
+                ownPrio={ownPrio}
+                collapsed={collapsed}
+                busy={busy}
+                alert={isAlert(n, today)}
+                toggle={hasKids ? { open: isOpen } : null}
+              />
+            ) : (
+              <g transform={Math.abs(z - 1) < 1e-3 ? undefined : `scale(${z.toFixed(3)})`}>
+                {prio !== null && p.depth > 0 && (
+                  <circle
+                    className={`prio p${prio} ${ownPrio ? "own" : "inherited"}`}
+                    r={r + 3.5}
+                  />
+                )}
+                {collapsed && <circle className="collapsed-halo" r={r + (prio ? 7 : 4)} />}
+                {busy && <circle className="busy" r={r + 9} />}
+                {p.depth > 0 && parent ? (
+                  <>
+                    <circle className="shape track" r={r} />
+                    {progress > 0 && (
+                      <circle
+                        className="progress-arc"
+                        r={r}
+                        transform={`rotate(${(-90 - turn).toFixed(2)})`}
+                        strokeDasharray={`${(progress * PARENT_C).toFixed(2)} ${PARENT_C.toFixed(2)}`}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <circle className="shape" r={r} />
+                )}
+                {isAlert(n, today) && (
+                  <circle className="alert-dot" cx={r * 0.8} cy={-r * 0.8} r={3.2} />
+                )}
+                {hasKids && p.depth > 0 && <Toggle at={along(deg, r + 10)} open={isOpen} />}
+              </g>
+            )}
             {showLabel &&
               (!outward ? (
                 <text
