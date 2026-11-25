@@ -1,23 +1,55 @@
-import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from "react";
-import { AppBar } from "./AppBar";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
+import { branchProgress, DetailPanel } from "./DetailPanel";
+import { FindBox } from "./FindBox";
 import { backlogUrl } from "./backlog";
-import { clock, markers, spokeId } from "./format";
+import { clock, markers, spokeId, typeOf } from "./format";
 import {
   buildBoard,
   GROUP_PARAM,
-  groupingFrom,
   kanbanUrl,
   type Card,
+  type Column,
   type Grouping,
+  groupingFrom,
 } from "./kanban";
-import { NodeModal } from "./NodeModal";
-import { TypeStageChips } from "./TypeStageChips";
+import { nextOnlyKeep } from "./nextOnly";
+import { Shell } from "./Shell";
+import { TypeChip } from "./TypeStageChips";
+import { ROOT_ID } from "./treeStore";
+import type { TreeResponse, ViewNode } from "./types";
+import { useAreas } from "./useAreas";
 import { useSubtree } from "./useSubtree";
-import { ViewLinks } from "./ViewLinks";
 
 interface Props {
   server: string | null;
   rootId: number;
+}
+
+const GROUPS: readonly { value: Grouping; label: string }[] = [
+  { value: "status", label: "Status" },
+  { value: "stage", label: "Stage" },
+];
+
+/** The depth-1 ancestor (area) of `id` in the slice, falling back on the slice's own path. */
+function areaIdOf(data: TreeResponse, byId: Map<number, ViewNode>, id: number): number | null {
+  const seen = new Set<number>();
+  let cur = byId.get(id);
+  while (cur && !seen.has(cur.id)) {
+    if (cur.parent === ROOT_ID) return cur.id;
+    seen.add(cur.id);
+    cur = cur.parent === null ? undefined : byId.get(cur.parent);
+  }
+  const above = data.path.map((c) => c.id);
+  const chain = above[0] === ROOT_ID ? above : [ROOT_ID, ...above];
+  return [...chain, data.root][1] ?? null;
 }
 
 /** A kanban board of every node beneath `rootId`, one column per status or stage. */
@@ -25,6 +57,8 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
   const {
     includeClosed,
     toggleClosed,
+    nextOnly,
+    toggleNextOnly,
     data,
     error,
     refreshError,
@@ -35,6 +69,8 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
     openDetail: open,
     closeDetail,
   } = useSubtree(server, rootId);
+  const areas = useAreas(server);
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const [group, setGroup] = useState<Grouping>(() => groupingFrom(window.location.search));
   const changeGroup = (next: Grouping): void => {
@@ -45,19 +81,47 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
     window.history.replaceState(window.history.state, "", url);
   };
 
-  const board = useMemo(
-    () => (data ? buildBoard(data, includeClosed, group) : []),
-    [data, includeClosed, group],
-  );
-  const rootNode = data?.nodes.find((n) => n.id === rootId);
   const nodesById = useMemo(() => new Map(data?.nodes.map((n) => [n.id, n])), [data]);
+  const kidsOf = useMemo(() => {
+    const m = new Map<number, ViewNode[]>();
+    for (const n of data?.nodes ?? []) {
+      if (n.parent === null) continue;
+      const list = m.get(n.parent);
+      if (list) list.push(n);
+      else m.set(n.parent, [n]);
+    }
+    return m;
+  }, [data]);
+  const board = useMemo(() => {
+    if (!data) return [];
+    const cols = buildBoard(data, includeClosed, group);
+    if (!nextOnly) return cols;
+    const keep = nextOnlyKeep(data.nodes, rootId);
+    return cols.map((c) => ({ ...c, cards: c.cards.filter((k) => keep.has(k.node.id)) }));
+  }, [data, includeClosed, group, nextOnly, rootId]);
+  const rootNode = nodesById.get(rootId);
   const total = board.reduce((sum, c) => sum + c.cards.length, 0);
   const today = data?.today ?? "";
+  const treeHref = server ? `/?server=${encodeURIComponent(server)}` : "/";
 
   useEffect(() => {
     const title = rootNode ? `${rootNode.title} · Kanban` : "Kanban";
     document.title = `${title} · Spokes view`;
   }, [rootNode]);
+
+  const jump = useCallback(
+    (id: number) => {
+      if (!nodesById.has(id)) {
+        window.location.assign(treeHref);
+        return;
+      }
+      boardRef.current
+        ?.querySelector(`[data-card-id="${id}"]`)
+        ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      open(id);
+    },
+    [nodesById, treeHref, open],
+  );
 
   let body: ReactElement;
   if (!server) {
@@ -72,140 +136,188 @@ export function KanbanApp({ server, rootId }: Props): ReactElement {
     body = <Message title="Loading…" />;
   } else if (total === 0) {
     body = (
-      <Message title="Nothing beneath this node">
-        {!includeClosed && rootNode && rootNode.closed_child_count > 0
-          ? 'Its children are all closed; turn on "Show closed" to see them.'
-          : "It has no children yet."}
+      <Message title={nextOnly ? "No next steps here" : "Nothing beneath this node"}>
+        {nextOnly
+          ? 'Turn off "Only what\'s next" to see every item.'
+          : !includeClosed && rootNode && rootNode.closed_child_count > 0
+            ? 'Its children are all closed; turn on "Show closed" to see them.'
+            : "It has no children yet."}
       </Message>
     );
   } else {
     body = (
-      <div className="board">
+      <div className="board" ref={boardRef}>
         {board.map((col) => (
-          <section
+          <BoardColumn
             key={col.key}
-            className="column"
-            data-group={group}
-            data-key={col.key}
-            aria-label={col.label}
-          >
-            <h2>
-              {group === "status" && (
-                <span className={`status-dot s-${col.key}`} aria-hidden="true" />
-              )}
-              {group === "stage" && col.key !== "none" && (
-                <span className={`stage-dot st-${col.key}`} aria-hidden="true" />
-              )}
-              {col.label}
-              <span className="count mono">{col.cards.length}</span>
-            </h2>
-            {col.cards.length === 0 ? (
-              <div className="empty-slot">Nothing here</div>
-            ) : (
-              <ol className="cards">
-                {col.cards.map((c) => (
-                  <li key={c.node.id}>
-                    <KanbanCard card={c} today={today} onOpen={open} />
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
+            col={col}
+            group={group}
+            today={today}
+            selectedId={detail?.id ?? null}
+            kidsOf={kidsOf}
+            onOpen={open}
+          />
         ))}
       </div>
     );
   }
 
+  const selected = detail ? nodesById.get(detail.id) : undefined;
+  const areaId = data && detail ? areaIdOf(data, nodesById, detail.id) : null;
+  const panel =
+    detail && server ? (
+      <DetailPanel
+        detail={detail}
+        fromTree={selected}
+        children={kidsOf.get(detail.id) ?? []}
+        areaSlot={areas.find((a) => a.id === areaId)?.slot ?? null}
+        timeZone={data?.time_zone ?? "UTC"}
+        today={today}
+        server={server}
+        treeHref={treeHref}
+        onClose={closeDetail}
+        onSelect={jump}
+      />
+    ) : null;
+
+  const rootTitle = rootNode?.title ?? spokeId(rootId);
   return (
-    <div className="app kanban-app">
-      <AppBar
-        view="kanban"
-        links={{
-          tree: server ? `/?server=${encodeURIComponent(server)}` : "/",
+    <Shell
+      phoneTitle={rootTitle}
+      sidebar={{
+        view: "kanban",
+        links: {
+          tree: treeHref,
           backlog: server ? backlogUrl(server, rootId) : "/",
-          kanban: server ? kanbanUrl(server, rootId) : null,
-        }}
-        place={
-          <>
-            <span className="board-title">
-              {data?.path.map((c) => c.title).join(" / ")}
-              {data && data.path.length > 0 ? " / " : ""}
-              <strong>{rootNode?.title ?? spokeId(rootId)}</strong>
-            </span>
-            {server && <span className="chip">{server}</span>}
-          </>
-        }
-        actions={
-          <>
-            <label>
-              <span className="sr-only">Group by</span>
-              <select
-                value={group}
-                onChange={(e) => changeGroup(groupingFrom(`?group=${e.target.value}`))}
-              >
-                <option value="status">Group by status</option>
-                <option value="stage">Group by stage</option>
-              </select>
-            </label>
-            <label className="switch-label">
-              <input
-                type="checkbox"
-                role="switch"
-                className="switch"
-                checked={includeClosed}
-                onChange={toggleClosed}
-              />
-              Show closed
-            </label>
-          </>
-        }
-        refresh={{
+          kanban: server ? kanbanUrl(server, rootId, group) : null,
+        },
+        find: <FindBox nodes={() => data?.nodes ?? []} onJump={jump} />,
+        areas: areas.map((a) => ({
+          id: a.id,
+          title: a.title,
+          slot: a.slot,
+          count: a.count,
+          ...(server ? { href: kanbanUrl(server, a.id, group) } : {}),
+          active: a.id === rootId,
+        })),
+        includeClosed,
+        onToggleClosed: toggleClosed,
+        nextOnly,
+        onToggleNext: toggleNextOnly,
+        server: server ? <span className="chip">{server}</span> : null,
+        serverName: server,
+        refresh: {
           onClick: () => void refresh(),
           busy: refreshing,
           disabled: refreshing || !data,
-          caption:
-            (data ? `${total} items` : "") + (checkedAt ? ` · checked ${clock(checkedAt)}` : ""),
-        }}
-      />
-      {(refreshError ?? data?.truncated) && (
-        <div className={`notice ${refreshError ? "warn" : ""}`} role="status">
-          {refreshError ??
-            "Large branch: the board shows only the nodes Spokes would return in one slice."}
-        </div>
+          caption: checkedAt ? `Updated ${clock(checkedAt)}` : "",
+        },
+      }}
+      panel={panel}
+      main={
+        <>
+          <div className="kb-bar">
+            <span className="kb-crumbs">
+              {data?.path.map((c) => c.title).join(" / ")}
+              {data && data.path.length > 0 ? " / " : ""}
+              <strong>{rootTitle}</strong>
+            </span>
+            <span className="kb-group-label">Group by</span>
+            <div className="seg" role="group" aria-label="Group by">
+              {GROUPS.map((g) => (
+                <button
+                  key={g.value}
+                  type="button"
+                  aria-pressed={group === g.value}
+                  onClick={() => changeGroup(g.value)}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {(refreshError ?? data?.truncated) && (
+            <div className={`notice ${refreshError ? "warn" : ""}`} role="status">
+              {refreshError ??
+                "Large branch: the board shows only the nodes Spokes would return in one slice."}
+            </div>
+          )}
+          {body}
+        </>
+      }
+    />
+  );
+}
+
+function BoardColumn({
+  col,
+  group,
+  today,
+  selectedId,
+  kidsOf,
+  onOpen,
+}: {
+  col: Column;
+  group: Grouping;
+  today: string;
+  selectedId: number | null;
+  kidsOf: Map<number, ViewNode[]>;
+  onOpen: (id: number) => void;
+}): ReactElement {
+  return (
+    <section className="column" data-group={group} data-key={col.key} aria-label={col.label}>
+      <h2>
+        <span className="col-dot" aria-hidden="true" />
+        {col.label}
+        <span className="count mono">{col.cards.length}</span>
+        <span className="col-rule" aria-hidden="true" />
+      </h2>
+      {col.cards.length === 0 ? (
+        <div className="empty-slot">Nothing here</div>
+      ) : (
+        <ol className="cards">
+          {col.cards.map((c) => (
+            <li key={c.node.id}>
+              <KanbanCard
+                card={c}
+                today={today}
+                kids={kidsOf.get(c.node.id) ?? []}
+                selected={c.node.id === selectedId}
+                onOpen={onOpen}
+              />
+            </li>
+          ))}
+        </ol>
       )}
-      <main className="main kanban-main">{body}</main>
-      {detail && server && (
-        <NodeModal
-          detail={detail}
-          fromTree={nodesById.get(detail.id)}
-          timeZone={data?.time_zone ?? "UTC"}
-          today={today}
-          onClose={closeDetail}
-          onSelect={open}
-          actions={(n) => <ViewLinks server={server} node={n} />}
-        />
-      )}
-    </div>
+    </section>
   );
 }
 
 function KanbanCard({
   card,
   today,
+  kids,
+  selected,
   onOpen,
 }: {
   card: Card;
   today: string;
+  kids: ViewNode[];
+  selected: boolean;
   onOpen: (id: number) => void;
 }): ReactElement {
   const n = card.node;
   const ms = markers(n, today);
   const prio = n.effective_priority;
+  const type = typeOf(n);
+  const progress = branchProgress(n, kids);
   return (
     <button
       type="button"
       className={`card ${n.deferred ? "deferred" : ""}`}
       data-status={n.status}
+      data-card-id={n.id}
+      aria-current={selected ? "true" : undefined}
       onClick={() => onOpen(n.id)}
     >
       {card.path.length > 0 && (
@@ -215,20 +327,10 @@ function KanbanCard({
       <span className="card-meta">
         <span className="mono">{spokeId(n.id)}</span>
         {n.kind === "area" && <span className="chip">area</span>}
-        <TypeStageChips node={n} />
+        {type !== null && <TypeChip type={type} />}
         {prio !== null && (
           <span className={`chip prio-chip p${prio}`} title={`Priority ${prio}`}>
             P{prio}
-          </span>
-        )}
-        {n.progress && (
-          <span className="muted" title="Steps done">
-            {n.progress.done}/{n.progress.total}
-          </span>
-        )}
-        {n.child_count > 0 && !n.progress && (
-          <span className="muted" title="Children">
-            {n.child_count} beneath
           </span>
         )}
         {ms.map((m) => (
@@ -236,6 +338,14 @@ function KanbanCard({
             {m.glyph}
           </span>
         ))}
+        {progress && progress.total > 0 && (
+          <span className="card-progress mono" title="Children done">
+            <span className="card-bar" aria-hidden="true">
+              <span style={{ width: `${(progress.done / progress.total) * 100}%` }} />
+            </span>
+            {progress.done}/{progress.total}
+          </span>
+        )}
       </span>
     </button>
   );
