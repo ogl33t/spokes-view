@@ -49,11 +49,7 @@ interface DetailsProps {
   expanded?: boolean;
   /** Set: an Expand/Collapse button on a node with children. */
   onToggle?: (id: number) => void;
-  /** Extra buttons in place of the standard actions row (the modal pages). */
-  actions?: (n: ViewNode) => ReactNode;
 }
-
-type PanelProps = Omit<DetailsProps, "actions">;
 
 const MAX_CHILDREN = 12;
 
@@ -114,7 +110,7 @@ function ProgressBar({ p }: { p: BranchProgress }): ReactElement {
 }
 
 /** The side panel beside the graph; a bottom sheet on a phone (see panel.css). */
-export function DetailPanel(props: PanelProps): ReactElement {
+export function DetailPanel(props: DetailsProps): ReactElement {
   return (
     <aside className="panel details detail-panel" aria-label="Details">
       <NodeDetails {...props} />
@@ -122,9 +118,9 @@ export function DetailPanel(props: PanelProps): ReactElement {
   );
 }
 
-/** Path, fields, children, notes and events of one node: the body of the panel and the modal. */
+/** Path, fields, children, notes and events of one node: the body of the panel. */
 export function NodeDetails(props: DetailsProps): ReactElement {
-  const { detail, fromTree, timeZone, today, onClose, onSelect, actions } = props;
+  const { detail, fromTree, timeZone, today, onClose, onSelect } = props;
   const { server, onFocus, treeHref, expanded = false, onToggle, areaSlot = null } = props;
   const kids = props.children ?? [];
   const n: ViewNode | undefined = detail.data?.node ?? fromTree;
@@ -239,7 +235,7 @@ export function NodeDetails(props: DetailsProps): ReactElement {
               </div>
             )
           )}
-          {actions ? actions(n) : standardActions(n)}
+          {standardActions(n)}
           {detail.error && <p className="warn">{detail.error}</p>}
           {n.waiting_on !== null && (
             <div className="callout question">

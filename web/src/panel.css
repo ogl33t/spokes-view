@@ -442,30 +442,6 @@ a.btn {
   background: var(--bg-hover);
 }
 
-/* ---- modal ---- */
-.modal {
-  width: min(40rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 4rem);
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--r-surface);
-  background: var(--bg-2);
-  color: var(--text);
-  box-shadow: var(--lift);
-}
-.modal::backdrop {
-  background: rgb(0 0 0 / 45%);
-  backdrop-filter: blur(2px);
-}
-@media (prefers-reduced-transparency: reduce) {
-  .modal::backdrop {
-    backdrop-filter: none;
-  }
-}
-.modal-body {
-  padding: 0.85rem 1.2rem 1.4rem;
-}
-
 @media (max-width: 760px) {
   .detail-panel {
     position: fixed;
@@ -483,9 +459,5 @@ a.btn {
   }
   .legend-body {
     max-width: calc(100vw - 1.5rem);
-  }
-  .modal {
-    width: calc(100vw - 1rem);
-    max-height: calc(100vh - 2rem);
   }
 }

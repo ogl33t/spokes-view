@@ -153,16 +153,6 @@ input {
   outline-offset: 2px;
 }
 
-.app {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto auto 1fr;
-  height: 100%;
-}
-.app.with-panel {
-  grid-template-columns: 1fr minmax(320px, 420px);
-}
-
 /* ---- base controls: every one is at least --ctl-h tall ---- */
 .btn,
 .icon-btn {
@@ -481,11 +471,8 @@ input[type="text"]:hover {
   vertical-align: -0.125em;
 }
 
-/* ---- phone width: the panel becomes a bottom sheet ---- */
+/* ---- phone width: larger touch targets ---- */
 @media (max-width: 760px) {
-  .app.with-panel {
-    grid-template-columns: 1fr;
-  }
   :root {
     --ctl-h: 44px;
   }

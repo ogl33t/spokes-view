@@ -8,7 +8,6 @@ import { KanbanApp } from "./KanbanApp";
 import "@fontsource-variable/atkinson-hyperlegible-next/wght.css";
 import "@fontsource-variable/martian-mono/wdth.css";
 import "./styles.css";
-import "./header.css";
 import "./shell.css";
 import "./graph.css";
 import "./panel.css";
