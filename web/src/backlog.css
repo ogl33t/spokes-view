@@ -1,15 +1,71 @@
 /* ---- backlog list ---- */
-/* filter toolbar: its own grid row under the header, outside the scrolling main area */
-.toolbar {
-  grid-row: 2;
-  grid-column: 1 / -1;
+/* breadcrumb row, then the filter toolbar; both stay put while the rows scroll */
+.bl-crumbs {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-4);
+  height: 52px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  min-width: 0;
+}
+.bl-path {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.bl-crumbs strong {
+  white-space: nowrap;
+}
+.bl-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 52px;
+  box-sizing: border-box;
+  padding: 0 20px;
   background: var(--bg);
   border-bottom: 1px solid var(--line);
   min-width: 0;
+}
+.toolbar-gap {
+  flex: 1;
+}
+.bl-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.bl-ring {
+  flex: none;
+}
+.bl-ring-track {
+  fill: var(--bg-2);
+  stroke: var(--rim);
+  stroke-width: 2;
+}
+.bl-ring-arc {
+  fill: none;
+  stroke: var(--done);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.backlog .row.selected {
+  background-color: var(--bg-3);
+}
+.backlog .row.selected .row-title {
+  font-weight: 600;
 }
 .toolbar .filter {
   display: block;
@@ -38,7 +94,7 @@
 .backlog {
   list-style: none;
   margin: 0;
-  padding: 0.6rem 1rem 1.5rem;
+  padding: 6px 0 1.5rem;
 }
 .backlog .row {
   --indent: 1.25rem;
@@ -133,10 +189,19 @@
 }
 
 @media (max-width: 760px) {
+  .bl-crumbs {
+    height: auto;
+    min-height: 44px;
+    padding: 0 var(--sp-3);
+  }
   .toolbar {
     flex-wrap: wrap;
+    height: auto;
     gap: var(--sp-1);
     padding: var(--sp-1) var(--sp-2);
+  }
+  .toolbar-gap {
+    display: none;
   }
   .toolbar .filter-text {
     flex: 0 0 100%;
