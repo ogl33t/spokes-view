@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent, ReactElement } from "react";
 import type { Layout, NodePos } from "./layout";
+import { branchProgress } from "./DetailPanel";
 import { clip, isAlert, markers, spokeId, STATUS_LABEL } from "./format";
 import { easeInOut, focusTarget, interpolateView, labelFlip, screenOf } from "./focus";
 import type { View } from "./focus";
@@ -8,7 +9,15 @@ import type { Store } from "./treeStore";
 import { knownChildren, missingChildren, needsFetch } from "./treeStore";
 import type { ViewNode } from "./types";
 import { glyphScale, onScreenGrowth } from "./zoomScale";
-import { fitPadding, innerLabelRank, labelledBounds, labelWidth, placeInnerLabels } from "./labels";
+import {
+  fitPadding,
+  inkFits,
+  innerLabelRank,
+  labelledBounds,
+  labelWidth,
+  overflowZoom,
+  placeInnerLabels,
+} from "./labels";
 import type { LabelBox } from "./labels";
 
 const MIN_K = 0.01;
@@ -186,7 +195,7 @@ export function Graph(props: GraphProps): ReactElement {
         if (!p) return 0;
         const m = labelMode(p, lod);
         if (!m.show || !m.outward || leafLabelHidden(n, lod, compact)) return 0;
-        return outwardLabelPx(n, today, grow, outwardMaxChars(lod));
+        return outwardLabelPx(n, isAreaPill(n, p), today, grow, outwardMaxChars(lod));
       };
     };
     const fitsAt = (k: number) => {
@@ -202,8 +211,9 @@ export function Graph(props: GraphProps): ReactElement {
       else hi = mid;
     }
     // If no label on the outermost ring can show inside the viewport at any zoom, fit the
-    // rings with modest room instead and let the outermost labels run past the edge; zoom in
-    // further, if need be, until the first of them shows.
+    // rings with modest room instead and let the outermost labels run past the edge: zoom out
+    // from there while the labels still show, as far as their ink needs to fit (or as little
+    // as runs past the edge); or zoom in further, if need be, until the first of them shows.
     const outer = layout.radii.length - 1;
     const labelledAt = (k: number) => {
       const z = bucket(k);
@@ -234,7 +244,11 @@ export function Graph(props: GraphProps): ReactElement {
       );
       k = modest;
       let top = Math.min(MAX_K, 1.4);
-      if (!labelledAt(modest) && modest < top && labelledAt(top)) {
+      if (labelledAt(modest) && lo < modest) {
+        k = overflowZoom(lo, modest, labelledAt, (z) =>
+          inkFits(labelledBounds(layout, z, labelPxAt(z)), z, w, h),
+        );
+      } else if (!labelledAt(modest) && modest < top && labelledAt(top)) {
         let bottom = modest;
         for (let i = 0; i < 30 && top / bottom > 1.001; i++) {
           const mid = Math.sqrt(bottom * top);
@@ -541,18 +555,20 @@ export function edgePath(p: NodePos, c: NodePos): string {
 
 /**
  * On-screen length, px, of a leaf's outward label at the outermost ring with its gap from
- * the node, as drawn at fit (a collapsed node shows its hidden count too). An area has no
- * outward label: its pill, centred on the node, reaches half its width.
+ * the node, as drawn at fit (a collapsed node shows its hidden count too). An area drawn as
+ * a pill has no outward label: the pill, centred on the node, reaches half its width. A
+ * deeper area is drawn like any other node, with an outward label.
  */
 function outwardLabelPx(
   n: ViewNode | undefined,
+  pill: boolean,
   today: string,
   grow: number,
   maxChars: number,
 ): number {
   if (!n) return 0;
   const hasKids = n.child_count > 0;
-  if (n.kind === "area") {
+  if (pill) {
     const chars = areaPillText(n, hasKids ? n.descendant_count : 0).length;
     return pillWidth(chars, FONT * grow) / 2;
   }
@@ -592,18 +608,27 @@ function nodeRadius(p: NodePos, parent: boolean): number {
 }
 
 /**
- * Share of a parent's children that are done: its own `progress` when the server gives one,
- * else the done children in the store over all its children, open and closed; 0 when unknown.
+ * Share of a parent's children that are done, by the same rule as the details panel, the
+ * Backlog and Kanban (`branchProgress`); 0 when unknown.
  */
 function progressOf(n: ViewNode, store: Store): number {
-  if (n.progress) return n.progress.total > 0 ? n.progress.done / n.progress.total : 0;
-  const total = n.child_count + n.closed_child_count;
-  if (total === 0) return 0;
-  let done = 0;
+  const kids: ViewNode[] = [];
   for (const id of knownChildren(store, n.id)) {
-    if (store.nodes.get(id)?.status === "done") done++;
+    const kid = store.nodes.get(id);
+    if (kid) kids.push(kid);
   }
-  return Math.min(1, done / total);
+  const p = branchProgress(n, kids);
+  return p && p.total > 0 ? Math.min(1, p.done / p.total) : 0;
+}
+
+/** Progress of every drawn node with children, by id. */
+function progressMap(layout: Layout, store: Store): ReadonlyMap<number, number> {
+  const out = new Map<number, number>();
+  for (const p of layout.nodes) {
+    const n = store.nodes.get(p.id);
+    if (n) out.set(p.id, progressOf(n, store));
+  }
+  return out;
 }
 
 /** Text inside an area's pill: its title, and the count hidden beneath when collapsed. */
@@ -938,6 +963,8 @@ const Nodes = memo(function Nodes(props: NodesProps) {
     () => placeInner(layout, store, expanded, k, turn),
     [layout, store, expanded, k, turn],
   );
+  // Progress depends on the store only, so a zoom or turn does not recount it.
+  const progressById = useMemo(() => progressMap(layout, store), [layout, store]);
   return (
     <g className="nodes">
       {layout.nodes.map((p) => {
@@ -979,7 +1006,7 @@ const Nodes = memo(function Nodes(props: NodesProps) {
         // in step with the labels.
         const z = glyphScale(k, p.room, r);
         const offset = (hasKids ? r + 20 : r + 6) * z;
-        const progress = parent && !area && p.depth > 0 ? progressOf(n, store) : 0;
+        const progress = parent && !area && p.depth > 0 ? (progressById.get(n.id) ?? 0) : 0;
         const cls = [
           "node",
           `s-${n.status}`,

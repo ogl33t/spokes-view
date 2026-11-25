@@ -133,7 +133,7 @@ export function labelledBounds(
   layout: Pick<Layout, "nodes">,
   k: number,
   labelPx: (id: number) => number,
-): { minX: number; minY: number; maxX: number; maxY: number } {
+): InkBounds {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -152,4 +152,50 @@ export function labelledBounds(
   }
   if (minX === Infinity) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
   return { minX, minY, maxX, maxY };
+}
+
+/** Bounds, layout units, as `labelledBounds` returns them. */
+export interface InkBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** Whether `ink`, drawn at zoom `k`, fits a `w` × `h` viewport with 12px to spare each side. */
+export function inkFits(ink: InkBounds, k: number, w: number, h: number): boolean {
+  return (
+    (ink.maxX - ink.minX) * k <= w - 2 * FIT_MARGIN &&
+    (ink.maxY - ink.minY) * k <= h - 2 * FIT_MARGIN
+  );
+}
+
+/**
+ * Zoom for a fit whose outermost labels cannot all show inside the view, searched in
+ * [`lo`, `hi`] where labels show at `hi` but not at `lo`: the largest zoom whose labelled
+ * ink still `fits`, else the smallest zoom at which a label shows (the least overflow).
+ */
+export function overflowZoom(
+  lo: number,
+  hi: number,
+  labelled: (k: number) => boolean,
+  fits: (k: number) => boolean,
+): number {
+  let bottom = lo;
+  let first = hi;
+  for (let i = 0; i < 30 && first / bottom > 1.001; i++) {
+    const mid = Math.sqrt(bottom * first);
+    if (labelled(mid)) first = mid;
+    else bottom = mid;
+  }
+  if (!fits(first)) return first;
+  let best = first;
+  let top = hi;
+  if (fits(top)) return top;
+  for (let i = 0; i < 30 && top / best > 1.001; i++) {
+    const mid = Math.sqrt(best * top);
+    if (fits(mid)) best = mid;
+    else top = mid;
+  }
+  return best;
 }

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { fitPadding, innerLabelRank, labelledBounds, labelWidth, placeInnerLabels } from "./labels";
+import {
+  fitPadding,
+  inkFits,
+  innerLabelRank,
+  labelledBounds,
+  labelWidth,
+  overflowZoom,
+  placeInnerLabels,
+} from "./labels";
 import type { LabelBox } from "./labels";
 import type { NodePos } from "./layout";
 
@@ -156,5 +164,40 @@ describe("labelledBounds", () => {
     expect([ink.minX, ink.minY, ink.maxX, ink.maxY].map(Math.round)).toEqual([
       -200, -200, 200, 200,
     ]);
+  });
+});
+
+describe("inkFits", () => {
+  const ink = { minX: -100, minY: -50, maxX: 100, maxY: 50 };
+
+  it("fits when the ink at the zoom leaves 12px each side", () => {
+    expect(inkFits(ink, 1, 224, 124)).toBe(true);
+    expect(inkFits(ink, 1, 223, 124)).toBe(false);
+    expect(inkFits(ink, 1, 224, 123)).toBe(false);
+  });
+
+  it("scales the ink by the zoom", () => {
+    expect(inkFits(ink, 0.5, 124, 74)).toBe(true);
+  });
+});
+
+describe("overflowZoom", () => {
+  // Labels show from 0.25; at zoom k the ink is 700k + 300 screen px wide (300px of labels).
+  const labelled = (k: number) => k >= 0.25;
+
+  it("takes the smallest labelled zoom when labels overflow even there", () => {
+    const k = overflowZoom(0.1, 0.32, labelled, (z) => 700 * z + 300 <= 390);
+    expect(k).toBeGreaterThanOrEqual(0.25);
+    expect(k).toBeLessThan(0.251);
+  });
+
+  it("takes the largest zoom whose labelled ink still fits", () => {
+    const k = overflowZoom(0.1, 0.5, labelled, (z) => 700 * z + 300 <= 600);
+    expect(k).toBeLessThanOrEqual(300 / 700);
+    expect(k).toBeGreaterThan(0.428);
+  });
+
+  it("keeps the top of the range when the ink fits there", () => {
+    expect(overflowZoom(0.1, 0.32, labelled, () => true)).toBe(0.32);
   });
 });
