@@ -122,6 +122,15 @@ describe("DetailPanel", () => {
     }
   });
 
+  it("hides the stage chip when it repeats the status", () => {
+    const same = node({ ...parent, stage: "in_progress" });
+    const dup = render({ detail: detailOf(same) });
+    expect(dup).toContain("status-chip");
+    expect(dup).not.toContain("stage-chip");
+    const differs = render({ detail: detailOf(node({ ...parent, stage: "planned" })) });
+    expect(differs).toContain(">planned<");
+  });
+
   it("offers Show in tree when there is no focus handler", () => {
     const html = render({ treeHref: "/?server=home" });
     expect(html).toContain("Show in tree");

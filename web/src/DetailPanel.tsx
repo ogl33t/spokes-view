@@ -6,6 +6,7 @@ import {
   markers,
   spokeId,
   stageOf,
+  STAGE_LABEL,
   STATUS_LABEL,
   typeOf,
 } from "./format";
@@ -135,6 +136,8 @@ export function NodeDetails(props: DetailsProps): ReactElement {
   const due = n ? dueState(n, day) : null;
   const type = n ? typeOf(n) : null;
   const stage = n ? stageOf(n) : null;
+  const showStage =
+    stage !== null && n !== undefined && STAGE_LABEL[stage] !== STATUS_LABEL[n.status];
   const progress = n ? branchProgress(n, kids) : null;
   const nextKid = kids.find((k) => k.is_next);
   const shown = kids.slice(0, MAX_CHILDREN);
@@ -155,7 +158,7 @@ export function NodeDetails(props: DetailsProps): ReactElement {
     ) : undefined;
     const toggle =
       onToggle && m.child_count > 0 ? (
-        <button type="button" className="btn" onClick={() => onToggle(m.id)}>
+        <button type="button" className="btn toggle" onClick={() => onToggle(m.id)}>
           {expanded ? "Collapse branch" : `Expand (${m.descendant_count} beneath)`}
         </button>
       ) : undefined;
@@ -180,10 +183,18 @@ export function NodeDetails(props: DetailsProps): ReactElement {
         <nav className="crumbs" aria-label="Path">
           {path.map((c) => (
             <span key={c.id}>
-              <button type="button" className="link" onClick={() => onSelect(c.id)}>
+              <button
+                type="button"
+                className="crumb"
+                title={c.title}
+                onClick={() => onSelect(c.id)}
+              >
                 {c.title}
               </button>
-              <span aria-hidden="true"> / </span>
+              <span className="crumb-sep" aria-hidden="true">
+                {" "}
+                /{" "}
+              </span>
             </span>
           ))}
         </nav>
@@ -203,7 +214,7 @@ export function NodeDetails(props: DetailsProps): ReactElement {
             <span className="mono">{spokeId(n.id)}</span>
             <span className={`chip status-chip s-${n.status}`}>{STATUS_LABEL[n.status]}</span>
             {type !== null && <TypeChip type={type} />}
-            {stage !== null && <StageChip stage={stage} />}
+            {stage !== null && showStage && <StageChip stage={stage} />}
             {n.effective_priority !== null && (
               <span
                 className={`chip prio-chip p${n.effective_priority}`}
