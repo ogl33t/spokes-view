@@ -167,6 +167,8 @@ Not authorized: tags, other stacks, changes to Spokes itself, new npm dependenci
 
 ## What shipped (2026-11-24)
 
+**Delivered 2026-11-25:** PR #6 approved and fast-forwarded to `main` (f86d32b); the `release` run published `ghcr.io/ogl33t/spokes-view:sha-f86d32b`; stacks `spokes: deploy sha-f86d32b` (f1eb927) pinned it, and http://kdev3:10060 served the new build about 3 minutes later (headless check: sidebar, areas, wheel, no page errors). Left: Brandon's iPhone check.
+
 All eight steps landed on `design-pass` (PR #6), one commit per step plus three follow-up fixes:
 
 | Step | Commit | Notes |
