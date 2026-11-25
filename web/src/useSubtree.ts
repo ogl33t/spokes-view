@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApiError, fetchNode, fetchTree, type TreeQuery } from "./api";
 import type { DetailState } from "./DetailPanel";
+import { loadPrefs, savePrefs } from "./prefs";
 import type { TreeResponse } from "./types";
 
 /** The API's deepest slice: a page shows this many levels beneath its root. */
@@ -14,6 +15,9 @@ export function errorOf(e: unknown): ApiError {
 export interface Subtree {
   includeClosed: boolean;
   toggleClosed: () => void;
+  /** Show only the next actions and the path to each. */
+  nextOnly: boolean;
+  toggleNextOnly: () => void;
   /** The latest slice beneath the root, or null before the first load. */
   data: TreeResponse | null;
   error: ApiError | null;
@@ -33,7 +37,8 @@ export interface Subtree {
  * Shared by the kanban board and the backlog list.
  */
 export function useSubtree(server: string | null, rootId: number): Subtree {
-  const [includeClosed, setIncludeClosed] = useState(false);
+  const [prefs, setPrefs] = useState(loadPrefs);
+  const { includeClosed, nextOnly } = prefs;
   const [slice, setSlice] = useState<{ etag: string | null; data: TreeResponse } | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -107,7 +112,20 @@ export function useSubtree(server: string | null, rootId: number): Subtree {
     [loadDetail],
   );
   const closeDetail = useCallback(() => setDetail(null), []);
-  const toggleClosed = useCallback(() => setIncludeClosed((c) => !c), []);
+  const toggleClosed = useCallback(() => {
+    setPrefs((p) => {
+      const next = { ...p, includeClosed: !p.includeClosed };
+      savePrefs(next);
+      return next;
+    });
+  }, []);
+  const toggleNextOnly = useCallback(() => {
+    setPrefs((p) => {
+      const next = { ...p, nextOnly: !p.nextOnly };
+      savePrefs(next);
+      return next;
+    });
+  }, []);
 
   // Refresh with the slice's tag: an unchanged slice costs a 304.
   const refresh = useCallback(async () => {
@@ -140,6 +158,8 @@ export function useSubtree(server: string | null, rootId: number): Subtree {
   return {
     includeClosed,
     toggleClosed,
+    nextOnly,
+    toggleNextOnly,
     data: slice?.data ?? null,
     error,
     refreshError,

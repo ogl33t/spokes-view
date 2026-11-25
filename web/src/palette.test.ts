@@ -99,3 +99,21 @@ describe("base palette", () => {
     });
   }
 });
+
+describe("area palette", () => {
+  for (const [theme, block] of Object.entries(themes)) {
+    describe(theme, () => {
+      for (let slot = 1; slot <= 6; slot++) {
+        const area = () => rgb(variable(block, `area-${slot}`));
+        for (const bg of ["bg", "bg-2"]) {
+          it(`--area-${slot} on --${bg} is visible (>= 3:1)`, () => {
+            expect(contrast(area(), rgb(variable(block, bg)))).toBeGreaterThanOrEqual(3);
+          });
+        }
+        it(`--on-area on --area-${slot} is readable (>= 4.5:1)`, () => {
+          expect(contrast(rgb(variable(block, "on-area")), area())).toBeGreaterThanOrEqual(4.5);
+        });
+      }
+    });
+  }
+});

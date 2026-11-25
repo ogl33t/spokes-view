@@ -37,6 +37,13 @@
   --stage-done: #9ece6a;
   --bg-hover: #292e42;
   --rim: #3b4261;
+  --area-1: #7dcfff;
+  --area-2: #bb9af7;
+  --area-3: #73daca;
+  --area-4: #ff9e64;
+  --area-5: #2ac3de;
+  --area-6: #c3e88d;
+  --on-area: #12141c;
 
   --font-ui:
     "Atkinson Hyperlegible Next Variable", system-ui, -apple-system, "Segoe UI", Roboto,
@@ -104,6 +111,13 @@
     --stage-in-progress: #824d06;
     --stage-in-review: #99430c;
     --stage-done: #26681b;
+    --area-1: #0b5f91;
+    --area-2: #6a3fc0;
+    --area-3: #086456;
+    --area-4: #99430c;
+    --area-5: #0a6f85;
+    --area-6: #4d6a14;
+    --on-area: #fafbfd;
     --lift: 0 1px 2px rgb(31 35 53 / 0.08), 0 8px 24px rgb(31 35 53 / 0.14);
     color-scheme: light;
   }

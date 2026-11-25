@@ -1,7 +1,7 @@
 ---
-status: Planned
+status: In progress
 spoke: SPOKE-258
-started:
+started: 2026-11-24
 finished:
 summary: Rebuild spokes-view around design direction A (Workbench) — sidebar, ringless wheel with new node shapes, one docked details panel, iPhone layout — and add find/jump, area filters with colours and "Only what's next".
 ---
