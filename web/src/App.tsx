@@ -34,6 +34,7 @@ import {
   knownChildren,
   needsFetch,
   ROOT_ID,
+  type Store,
 } from "./treeStore";
 import type { ServerEntry, TreeResponse } from "./types";
 
@@ -108,6 +109,16 @@ function useCompact(): boolean {
   );
 }
 
+const CAPPED_NOTE =
+  "Large tree: the node limit cut the full load short, so some next steps may be missing.";
+
+/** Every loaded node that has loaded children: all of them open. */
+function allBranches(store: Store): Set<number> {
+  const out = new Set<number>();
+  for (const id of store.nodes.keys()) if (knownChildren(store, id).length > 0) out.add(id);
+  return out;
+}
+
 /** Runs `tasks` with at most `limit` in flight; results in order. */
 async function pool<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
   const out = new Array<T>(tasks.length);
@@ -152,11 +163,13 @@ export function App(): ReactElement {
   const slicesRef = useRef(slices);
   const detailRef = useRef(detail);
   const includeClosedRef = useRef(includeClosed);
+  const nextOnlyRef = useRef(nextOnly);
   useLayoutEffect(() => {
     slicesRef.current = slices;
     detailRef.current = detail;
     includeClosedRef.current = includeClosed;
-  }, [slices, detail, includeClosed]);
+    nextOnlyRef.current = nextOnly;
+  }, [slices, detail, includeClosed, nextOnly]);
 
   useEffect(() => {
     savePrefs({ includeClosed, nextOnly });
@@ -169,7 +182,8 @@ export function App(): ReactElement {
   const store = useMemo(() => buildStore(slices.map((s) => s.data)), [slices]);
 
   // Load (or reload) a server. `keep` keeps expansion and selection (the closed toggle).
-  const load = useCallback(async (name: string, closed: boolean, keep: boolean) => {
+  // `whole` loads the full tree (depth EXPAND_ALL_DEPTH, under the node cap) for "Only what's next".
+  const load = useCallback(async (name: string, closed: boolean, keep: boolean, whole: boolean) => {
     const gen = ++generation.current;
     abort.current?.abort();
     const ctl = new AbortController();
@@ -185,22 +199,19 @@ export function App(): ReactElement {
       setDetail(null);
     }
     try {
-      const first = await fetchTree(
-        name,
-        { root: ROOT_ID, depth: FIRST_DEPTH, includeClosed: closed },
-        null,
-        ctl.signal,
-      );
+      const rootQuery: TreeQuery = {
+        root: ROOT_ID,
+        depth: whole ? EXPAND_ALL_DEPTH : FIRST_DEPTH,
+        includeClosed: closed,
+      };
+      const first = await fetchTree(name, rootQuery, null, ctl.signal);
       if (gen !== generation.current || !first.data) return;
-      const loaded: Slice[] = [
-        {
-          q: { root: ROOT_ID, depth: FIRST_DEPTH, includeClosed: closed },
-          etag: first.etag,
-          data: first.data,
-        },
-      ];
+      const loaded: Slice[] = [{ q: rootQuery, etag: first.etag, data: first.data }];
       // Reload the branches that were open, with the new closed setting.
-      const branches = previous.slice(1).map((s) => ({ ...s.q, includeClosed: closed }));
+      // The whole tree already holds them.
+      const branches = whole
+        ? []
+        : previous.slice(1).map((s) => ({ ...s.q, includeClosed: closed }));
       const got = await pool(
         branches.map((q) => async () => {
           try {
@@ -216,10 +227,13 @@ export function App(): ReactElement {
       if (gen !== generation.current) return;
       for (const s of got) if (s) loaded.push(s);
       setSlices(loaded);
-      if (!keep) {
-        setExpanded(
-          initialExpansion(buildStore(loaded.map((s) => s.data)), initialBudget(window.innerWidth)),
-        );
+      const loadedStore = buildStore(loaded.map((s) => s.data));
+      if (whole) {
+        setExpanded(allBranches(loadedStore));
+        setFitKey((k) => k + 1);
+        if (loadedStore.truncated) setExpandNote(CAPPED_NOTE);
+      } else if (!keep) {
+        setExpanded(initialExpansion(loadedStore, initialBudget(window.innerWidth)));
         setFitKey((k) => k + 1);
       }
       setTree({ kind: "ready" });
@@ -239,7 +253,7 @@ export function App(): ReactElement {
       setServer(name);
       setActiveArea(null);
       setFocusRequest(null);
-      void load(name, includeClosedRef.current, false);
+      void load(name, includeClosedRef.current, false, nextOnlyRef.current);
     },
     [load],
   );
@@ -263,11 +277,26 @@ export function App(): ReactElement {
   const toggleClosed = () => {
     const next = !includeClosed;
     setIncludeClosed(next);
-    if (server) void load(server, next, true);
+    if (server) void load(server, next, true, nextOnly);
   };
 
   const toggleNextOnly = () => {
-    setNextOnly((v) => !v);
+    const next = !nextOnly;
+    setNextOnly(next);
+    setExpandNote(null);
+    const whole = slices[0]?.q.depth === EXPAND_ALL_DEPTH && slices[0].q.root === ROOT_ID;
+    if (next && server && !whole) {
+      // Next steps sit deep: load the whole tree first; the fit follows the load.
+      void load(server, includeClosed, true, true);
+      return;
+    }
+    if (next) {
+      setExpanded(allBranches(store));
+      if (store.truncated) setExpandNote(CAPPED_NOTE);
+    } else if (whole) {
+      // Keep the loaded data, but go back to a first-view opening.
+      setExpanded(initialExpansion(store, initialBudget(window.innerWidth)));
+    }
     setFitKey((k) => k + 1);
   };
 
@@ -468,7 +497,7 @@ export function App(): ReactElement {
     if (!server || refreshBusy.current || tree.kind === "loading") return;
     const current = slicesRef.current;
     if (current.length === 0) {
-      void load(server, includeClosed, false);
+      void load(server, includeClosed, false, nextOnly);
       return;
     }
     refreshBusy.current = true;
@@ -508,7 +537,7 @@ export function App(): ReactElement {
       refreshBusy.current = false;
       setRefreshing(false);
     }
-  }, [server, tree.kind, includeClosed, load, loadDetail]);
+  }, [server, tree.kind, includeClosed, nextOnly, load, loadDetail]);
 
   useEffect(() => {
     const t = window.setInterval(() => {
@@ -586,7 +615,7 @@ export function App(): ReactElement {
       <TreeError
         error={tree.error}
         server={server ?? ""}
-        onRetry={() => server && void load(server, includeClosed, false)}
+        onRetry={() => server && void load(server, includeClosed, false, nextOnly)}
       />
     );
   } else if (tree.kind === "loading" && slices.length === 0) {
