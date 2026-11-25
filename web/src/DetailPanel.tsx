@@ -31,21 +31,30 @@ export interface DetailState {
 interface DetailsProps {
   detail: DetailState;
   /** The node as the tree knows it, shown until the detail arrives. */
-  fromTree: ViewNode | undefined;
+  fromTree?: ViewNode | undefined;
+  /** The children the page knows, for the progress bar, next step and children list. */
+  children?: ViewNode[];
+  /** Colour slot (1..6) of the area the node sits under; area nodes draw it as their dot. */
+  areaSlot?: number | null;
   timeZone: string;
   today: string;
+  /** The server shown, for the links to a node's backlog and kanban pages. */
+  server?: string;
   onClose: () => void;
   onSelect: (id: number) => void;
-  /** Buttons shown under the title, for the node on show. */
+  /** Set: a primary "Focus branch" button. Otherwise `treeHref` gives "Show in tree". */
+  onFocus?: (id: number) => void;
+  treeHref?: string;
+  expanded?: boolean;
+  /** Set: an Expand/Collapse button on a node with children. */
+  onToggle?: (id: number) => void;
+  /** Extra buttons in place of the standard actions row (the modal pages). */
   actions?: (n: ViewNode) => ReactNode;
 }
 
-interface PanelProps extends Omit<DetailsProps, "actions"> {
-  expanded: boolean;
-  onToggle: (id: number) => void;
-  /** The server shown, for the links to a node's backlog and kanban pages. */
-  server: string;
-}
+type PanelProps = Omit<DetailsProps, "actions">;
+
+const MAX_CHILDREN = 12;
 
 function Row({ label, children }: { label: string; children: ReactNode }): ReactElement {
   return (
@@ -56,30 +65,67 @@ function Row({ label, children }: { label: string; children: ReactNode }): React
   );
 }
 
-/** The side panel beside the graph. */
-export function DetailPanel(props: PanelProps): ReactElement {
-  const { expanded, onToggle, server, ...rest } = props;
+export interface BranchProgress {
+  done: number;
+  active: number;
+  total: number;
+}
+
+/**
+ * Done / in progress / total for a node: its own `progress` when the server gives one,
+ * else counted from the known children plus the closed children the tree leaves out.
+ */
+export function branchProgress(n: ViewNode, kids: ViewNode[]): BranchProgress | null {
+  const active = kids.filter((k) => k.status === "in_progress").length;
+  if (n.progress) {
+    const { done, total } = n.progress;
+    return { done, active: Math.min(active, Math.max(total - done, 0)), total };
+  }
+  if (n.child_count + n.closed_child_count === 0 && kids.length === 0) return null;
+  const closedShown = kids.filter((k) => k.status === "done" || k.status === "dropped").length;
+  const closed = Math.max(n.closed_child_count, closedShown);
+  const doneShown = kids.filter((k) => k.status === "done").length;
+  const total = Math.max(kids.length - closedShown, n.child_count) + closed;
+  const done = doneShown + (closed - closedShown);
+  return { done, active: Math.min(active, total - done), total };
+}
+
+function ProgressBar({ p }: { p: BranchProgress }): ReactElement {
+  const pct = (v: number) => `${(v / p.total) * 100}%`;
   return (
-    <aside className="panel details" aria-label="Node details">
-      <NodeDetails
-        {...rest}
-        actions={(n) => (
-          <ViewLinks server={server} node={n}>
-            {n.child_count > 0 && (
-              <button type="button" className="btn" onClick={() => onToggle(n.id)}>
-                {expanded ? "Collapse branch" : `Expand (${n.descendant_count} beneath)`}
-              </button>
-            )}
-          </ViewLinks>
-        )}
-      />
+    <div className="dp-progress">
+      <div
+        className="dp-bar"
+        role="progressbar"
+        aria-label="Progress"
+        aria-valuemin={0}
+        aria-valuemax={p.total}
+        aria-valuenow={p.done}
+      >
+        <span className="dp-bar-done" style={{ width: pct(p.done) }} />
+        <span className="dp-bar-active" style={{ width: pct(p.active) }} />
+      </div>
+      <span className="dp-progress-label mono">
+        {p.done} of {p.total} done
+      </span>
+    </div>
+  );
+}
+
+/** The side panel beside the graph; a bottom sheet on a phone (see panel.css). */
+export function DetailPanel(props: PanelProps): ReactElement {
+  return (
+    <aside className="panel details detail-panel" aria-label="Details">
+      <NodeDetails {...props} />
     </aside>
   );
 }
 
-/** Path, fields, notes and events of one node: the body of the panel and the modal. */
+/** Path, fields, children, notes and events of one node: the body of the panel and the modal. */
 export function NodeDetails(props: DetailsProps): ReactElement {
   const { detail, fromTree, timeZone, today, onClose, onSelect, actions } = props;
+  const { server, onFocus, treeHref, expanded = false, onToggle, areaSlot = null } = props;
+  const kids = props.children ?? [];
   const n: ViewNode | undefined = detail.data?.node ?? fromTree;
   const notes = detail.data?.node.notes ?? null;
   const path = detail.data?.path ?? [];
@@ -89,6 +135,44 @@ export function NodeDetails(props: DetailsProps): ReactElement {
   const due = n ? dueState(n, day) : null;
   const type = n ? typeOf(n) : null;
   const stage = n ? stageOf(n) : null;
+  const progress = n ? branchProgress(n, kids) : null;
+  const nextKid = kids.find((k) => k.is_next);
+  const shown = kids.slice(0, MAX_CHILDREN);
+  const more = n ? Math.max(kids.length, n.child_count) - shown.length : 0;
+  const slot = areaSlot !== null ? Math.min(Math.max(areaSlot, 1), 6) : null;
+  const dotStyle =
+    n?.kind === "area" && slot !== null ? { color: `var(--area-${slot})` } : undefined;
+
+  const standardActions = (m: ViewNode): ReactElement | null => {
+    const lead = onFocus ? (
+      <button type="button" className="btn primary" onClick={() => onFocus(m.id)}>
+        Focus branch
+      </button>
+    ) : treeHref ? (
+      <a className="btn" href={treeHref}>
+        Show in tree
+      </a>
+    ) : undefined;
+    const toggle =
+      onToggle && m.child_count > 0 ? (
+        <button type="button" className="btn" onClick={() => onToggle(m.id)}>
+          {expanded ? "Collapse branch" : `Expand (${m.descendant_count} beneath)`}
+        </button>
+      ) : undefined;
+    if (server) {
+      return (
+        <ViewLinks server={server} node={m} lead={lead}>
+          {toggle}
+        </ViewLinks>
+      );
+    }
+    return lead || toggle ? (
+      <p className="actions">
+        {lead}
+        {toggle}
+      </p>
+    ) : null;
+  };
 
   return (
     <>
@@ -112,15 +196,39 @@ export function NodeDetails(props: DetailsProps): ReactElement {
       ) : (
         <>
           <h2>
-            <span className={`status-dot s-${n.status}`} aria-hidden="true" />
+            <span className={`status-dot s-${n.status}`} style={dotStyle} aria-hidden="true" />
             {n.title}
           </h2>
           <p className="ids">
-            <span className="mono">{spokeId(n.id)}</span> · {n.kind}
-            {n.ordered ? " · ordered steps" : ""} ·{" "}
-            <span className={`status-text s-${n.status}`}>{STATUS_LABEL[n.status]}</span>
+            <span className="mono">{spokeId(n.id)}</span>
+            <span className={`chip status-chip s-${n.status}`}>{STATUS_LABEL[n.status]}</span>
+            {type !== null && <TypeChip type={type} />}
+            {stage !== null && <StageChip stage={stage} />}
+            {n.effective_priority !== null && (
+              <span
+                className={`chip prio-chip p${n.effective_priority}`}
+                title={n.priority === null ? "Priority inherited" : "Priority"}
+              >
+                P{n.effective_priority}
+              </span>
+            )}
           </p>
-          {actions?.(n)}
+          {progress && progress.total > 0 && <ProgressBar p={progress} />}
+          {nextKid ? (
+            <button type="button" className="dp-next" onClick={() => onSelect(nextKid.id)}>
+              <span className="dp-next-label">Next step</span>
+              <span className="dp-next-title">{nextKid.title}</span>
+              <span className="mono dp-next-id">{spokeId(nextKid.id)}</span>
+            </button>
+          ) : (
+            n.is_next && (
+              <div className="dp-next here">
+                <span className="dp-next-label">Next step</span>
+                <span className="dp-next-title">This is the next step</span>
+              </div>
+            )
+          )}
+          {actions ? actions(n) : standardActions(n)}
           {detail.error && <p className="warn">{detail.error}</p>}
           {n.waiting_on !== null && (
             <div className="callout question">
@@ -134,25 +242,11 @@ export function NodeDetails(props: DetailsProps): ReactElement {
             </div>
           )}
           <dl className="fields">
-            {type !== null && (
-              <Row label="Type">
-                <TypeChip type={type} />
-              </Row>
-            )}
-            {stage !== null && (
-              <Row label="Stage">
-                <StageChip stage={stage} />
-              </Row>
-            )}
-            {n.effective_priority !== null && (
-              <Row label="Priority">
-                {n.priority !== null
-                  ? `level ${n.priority}`
-                  : `level ${n.effective_priority} (inherited)`}
-              </Row>
-            )}
+            <Row label="Kind">
+              {n.kind}
+              {n.ordered ? ", ordered steps" : ""}
+            </Row>
             {n.focus !== null && <Row label="Focus">#{n.focus} on the focus list</Row>}
-            {n.is_next && <Row label="Next step">the actionable step of its ordered parent</Row>}
             {n.is_step && !n.is_next && <Row label="Step">a step of an ordered parent</Row>}
             {n.due && (
               <Row label="Due">
@@ -175,14 +269,6 @@ export function NodeDetails(props: DetailsProps): ReactElement {
             )}
             {n.answered && <Row label="Answered">yes; ready for an agent to claim</Row>}
             {n.repeat && <Row label="Repeats">{n.repeat}</Row>}
-            {n.progress && (
-              <Row label="Progress">
-                <span className="mono">
-                  {n.progress.done} of {n.progress.total}
-                </span>{" "}
-                steps done
-              </Row>
-            )}
             <Row label="Beneath">
               <span className="mono">{n.child_count}</span> direct,{" "}
               <span className="mono">{n.descendant_count}</span> in all
@@ -213,6 +299,23 @@ export function NodeDetails(props: DetailsProps): ReactElement {
                 </span>
               ))}
             </p>
+          )}
+          {shown.length > 0 && (
+            <>
+              <h3>Children</h3>
+              <ul className="dp-children">
+                {shown.map((k) => (
+                  <li key={k.id}>
+                    <button type="button" onClick={() => onSelect(k.id)}>
+                      <span className={`status-dot s-${k.status}`} aria-hidden="true" />
+                      <span className="dp-child-title">{k.title}</span>
+                      <span className={`status-text s-${k.status}`}>{STATUS_LABEL[k.status]}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {more > 0 && <p className="muted small">+{more} more</p>}
+            </>
           )}
           <h3>Notes</h3>
           {detail.loading && !detail.data ? (

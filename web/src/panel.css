@@ -66,14 +66,20 @@
   stroke: var(--bg);
 }
 
-/* ---- detail panel ---- */
-.panel {
+/* ---- detail panel ----
+   Root: aside.detail-panel (also .panel, which the current pages place in their grid).
+   Docked beside the page, 360px; a bottom sheet at phone width. The modal body reuses
+   the .details rules below. */
+.detail-panel {
   grid-row: 3;
   grid-column: 2;
+  box-sizing: border-box;
+  width: 360px;
+  max-width: 100%;
   overflow: auto;
   background: var(--bg-2);
   border-left: 1px solid var(--line);
-  padding: 0.75rem 1.1rem 1.5rem;
+  padding: var(--sp-3) var(--sp-4) var(--sp-5);
   min-height: 0;
 }
 .panel-head {
@@ -125,10 +131,146 @@
   font-weight: 600;
 }
 .ids {
-  margin: 0 0 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
   color: var(--muted);
   font-size: var(--fs-sm);
 }
+.ids .mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text);
+}
+/* status colours here so the panel does not depend on the graph's stylesheet */
+.detail-panel .s-open,
+.details .s-open {
+  color: var(--open);
+}
+.detail-panel .s-in_progress,
+.details .s-in_progress {
+  color: var(--in-progress);
+}
+.detail-panel .s-waiting,
+.details .s-waiting {
+  color: var(--waiting);
+}
+.detail-panel .s-done,
+.details .s-done {
+  color: var(--done);
+}
+.detail-panel .s-dropped,
+.details .s-dropped {
+  color: var(--dropped);
+}
+
+.dp-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: 0 0 var(--sp-3);
+}
+.dp-bar {
+  flex: 1;
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-3);
+}
+.dp-bar-done {
+  background: var(--done);
+}
+.dp-bar-active {
+  background: var(--in-progress);
+}
+.dp-progress-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.dp-next {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 var(--sp-3);
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--next);
+  border-radius: var(--r-surface);
+}
+button.dp-next {
+  cursor: pointer;
+}
+button.dp-next:hover,
+button.dp-next:focus-visible {
+  background: var(--bg-hover);
+}
+.dp-next-label {
+  grid-column: 1 / -1;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--next);
+}
+.dp-next-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.dp-next-id {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  align-self: center;
+}
+
+.dp-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dp-children button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: var(--ctl-h, 32px);
+  box-sizing: border-box;
+  padding: var(--sp-1) var(--sp-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--r-ctl);
+  cursor: pointer;
+}
+.dp-children button:hover,
+.dp-children button:focus-visible {
+  background: var(--bg-hover);
+}
+.dp-child-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dp-children .status-text {
+  font-size: var(--fs-xs);
+}
+
 .fields {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -297,12 +439,13 @@ a.btn {
 }
 
 @media (max-width: 760px) {
-  .panel {
+  .detail-panel {
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
-    max-height: 58vh;
+    width: auto;
+    max-height: 70vh;
     border-left: none;
     border-top: 1px solid var(--line);
     border-radius: var(--r-sheet) var(--r-sheet) 0 0;
