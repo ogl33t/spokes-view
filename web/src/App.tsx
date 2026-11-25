@@ -6,18 +6,24 @@ import {
   useRef,
   useState,
   type ReactElement,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { AppBar } from "./AppBar";
 import { ApiError, fetchNode, fetchTree, listServers, type TreeQuery } from "./api";
+import { areaOf, areaSlots } from "./areas";
 import { ContextMenu } from "./ContextMenu";
 import { DetailPanel, type DetailState } from "./DetailPanel";
+import { FindBox } from "./FindBox";
 import { clock, spokeId } from "./format";
 import { Graph } from "./Graph";
 import { backlogUrl } from "./backlog";
 import { kanbanUrl } from "./kanban";
 import { layoutRadial } from "./layout";
 import { Legend } from "./Legend";
+import { nextOnlyKeep } from "./nextOnly";
+import { loadPrefs, savePrefs } from "./prefs";
+import { Shell } from "./Shell";
+import type { SidebarArea } from "./Sidebar";
 import {
   ancestors,
   buildStore,
@@ -83,6 +89,25 @@ function storedServer(): string | null {
   }
 }
 
+const COMPACT_QUERY = "(max-width: 599px)";
+
+function subscribeCompact(onChange: () => void): () => void {
+  const mq = window.matchMedia(COMPACT_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => {
+    mq.removeEventListener("change", onChange);
+  };
+}
+
+/** A viewport under 600px: the graph labels only areas and parents at the first fit. */
+function useCompact(): boolean {
+  return useSyncExternalStore(
+    subscribeCompact,
+    () => window.matchMedia(COMPACT_QUERY).matches,
+    () => false,
+  );
+}
+
 /** Runs `tasks` with at most `limit` in flight; results in order. */
 async function pool<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
   const out = new Array<T>(tasks.length);
@@ -102,7 +127,8 @@ export function App(): ReactElement {
   const [servers, setServers] = useState<ServerEntry[] | null>(null);
   const [serversError, setServersError] = useState<string | null>(null);
   const [server, setServer] = useState<string | null>(null);
-  const [includeClosed, setIncludeClosed] = useState(false);
+  const [includeClosed, setIncludeClosed] = useState(() => loadPrefs().includeClosed);
+  const [nextOnly, setNextOnly] = useState(() => loadPrefs().nextOnly);
   const [slices, setSlices] = useState<Slice[]>([]);
   const [tree, setTree] = useState<TreeState>({ kind: "idle" });
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -117,14 +143,24 @@ export function App(): ReactElement {
   const [expandingAll, setExpandingAll] = useState(false);
   const [expandNote, setExpandNote] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: number; x: number; y: number } | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{ id: number; seq: number } | null>(null);
+  const [activeArea, setActiveArea] = useState<number | null>(null);
+  const focusSeq = useRef(0);
+  const compact = useCompact();
 
   // The latest values, for async work that outlives a render.
   const slicesRef = useRef(slices);
   const detailRef = useRef(detail);
+  const includeClosedRef = useRef(includeClosed);
   useLayoutEffect(() => {
     slicesRef.current = slices;
     detailRef.current = detail;
-  }, [slices, detail]);
+    includeClosedRef.current = includeClosed;
+  }, [slices, detail, includeClosed]);
+
+  useEffect(() => {
+    savePrefs({ includeClosed, nextOnly });
+  }, [includeClosed, nextOnly]);
   /** Bumped on every server or closed-toggle switch; stale responses are dropped. */
   const generation = useRef(0);
   const abort = useRef<AbortController | null>(null);
@@ -196,13 +232,14 @@ export function App(): ReactElement {
     }
   }, []);
 
-  // Picking a server loads it from scratch (closed nodes hidden again).
+  // Picking a server loads it from scratch, with the saved closed setting.
   const choose = useCallback(
     (name: string) => {
       rememberServer(name);
       setServer(name);
-      setIncludeClosed(false);
-      void load(name, false, false);
+      setActiveArea(null);
+      setFocusRequest(null);
+      void load(name, includeClosedRef.current, false);
     },
     [load],
   );
@@ -228,6 +265,17 @@ export function App(): ReactElement {
     setIncludeClosed(next);
     if (server) void load(server, next, true);
   };
+
+  const toggleNextOnly = () => {
+    setNextOnly((v) => !v);
+    setFitKey((k) => k + 1);
+  };
+
+  /** Glides the graph to `id` once it is drawn. */
+  const requestFocus = useCallback((id: number) => {
+    focusSeq.current += 1;
+    setFocusRequest({ id, seq: focusSeq.current });
+  }, []);
 
   // Detail: fetched on click, and again on refresh with its tag.
   const loadDetail = useCallback(
@@ -314,6 +362,57 @@ export function App(): ReactElement {
       }
     },
     [server, store, expanded, loading, includeClosed],
+  );
+
+  // Find: select and glide to a node, loading the branches down to it when it is not loaded.
+  const jump = useCallback(
+    async (id: number) => {
+      if (!server) return;
+      if (store.nodes.has(id)) {
+        select(id);
+        requestFocus(id);
+        return;
+      }
+      const gen = generation.current;
+      setRefreshError(null);
+      try {
+        const found = await fetchNode(server, id, includeClosed, null);
+        if (gen !== generation.current || !found.data) return;
+        const path = found.data.path.map((c) => c.id);
+        let work = slicesRef.current;
+        let have = buildStore(work.map((s) => s.data));
+        // Fetch from the deepest loaded ancestor until the node arrives.
+        while (!have.nodes.has(id)) {
+          const from = [...path].reverse().find((a) => have.nodes.has(a));
+          if (from === undefined) throw new Error("its branch is not in this tree");
+          const q = { root: from, depth: BRANCH_DEPTH, includeClosed };
+          const r = await fetchTree(server, q, null);
+          if (gen !== generation.current) return;
+          if (!r.data) throw new Error(`${spokeId(from)} did not load`);
+          const data = r.data;
+          const next = [...work.filter((x) => x.q.root !== from), { q, etag: r.etag, data }];
+          const after = buildStore(next.map((s) => s.data));
+          const deeper = [...path, id].reverse().find((a) => after.nodes.has(a));
+          // A branch over the node cap may leave the path out: stop rather than loop.
+          if (deeper === from) throw new Error(`${spokeId(from)} is too large to open`);
+          work = next;
+          have = after;
+        }
+        setSlices(work);
+        setExpanded((ex) => {
+          const n = new Set(ex);
+          for (const a of path) n.add(a);
+          return n;
+        });
+        setSelected(id);
+        setDetail({ id, data: found.data, etag: found.etag, error: null, loading: false });
+        requestFocus(id);
+      } catch (e) {
+        if (gen === generation.current)
+          setRefreshError(`Could not find ${spokeId(id)}: ${errorOf(e).message}`);
+      }
+    },
+    [server, store, includeClosed, select, requestFocus],
   );
 
   // Open every branch, fetching the ones not loaded yet, up to EXPAND_ALL_LIMIT drawn nodes.
@@ -433,11 +532,44 @@ export function App(): ReactElement {
   const closeMenu = useCallback(() => setMenu(null), []);
   const menuNode = menu ? store.nodes.get(menu.id) : undefined;
 
-  const layout = useMemo(
-    () =>
-      layoutRadial(ROOT_ID, (id) => (expanded.has(id) ? knownChildren(store, id) : []), undefined),
-    [store, expanded],
-  );
+  const layout = useMemo(() => {
+    const keep = nextOnly ? nextOnlyKeep(store.nodes.values(), ROOT_ID) : null;
+    return layoutRadial(
+      ROOT_ID,
+      (id) => {
+        if (!expanded.has(id)) return [];
+        const kids = knownChildren(store, id);
+        return keep ? kids.filter((k) => keep.has(k)) : kids;
+      },
+      undefined,
+    );
+  }, [store, expanded, nextOnly]);
+
+  const slots = useMemo(() => areaSlots(store), [store]);
+  const areaSlotOf = useCallback((id: number) => slots.get(id) ?? null, [slots]);
+  const areas: SidebarArea[] = [...slots].flatMap(([id, slot]) => {
+    const n = store.nodes.get(id);
+    if (!n) return [];
+    const active = activeArea === id;
+    return [
+      {
+        id,
+        title: n.title,
+        slot,
+        count: n.descendant_count,
+        active,
+        onPick: () => {
+          if (active) {
+            setActiveArea(null);
+            setFocusRequest(null);
+          } else {
+            setActiveArea(id);
+            requestFocus(id);
+          }
+        },
+      },
+    ];
+  });
 
   const root = store.nodes.get(ROOT_ID);
   const current = servers?.find((s) => s.name === server);
@@ -479,85 +611,60 @@ export function App(): ReactElement {
         onSelect={select}
         onToggle={(id) => void toggle(id)}
         onMenu={(id, x, y) => setMenu({ id, x, y })}
+        areaSlotOf={areaSlotOf}
+        focusRequest={focusRequest}
+        dimOutside={activeArea}
+        compact={compact}
       />
     );
   } else {
     body = <Message title="Loading…" />;
   }
 
-  return (
-    <div className={`app ${detail ? "with-panel" : ""}`}>
-      <AppBar
-        view="tree"
-        links={{
-          tree: server ? `/?server=${encodeURIComponent(server)}` : "/",
-          backlog: server ? backlogUrl(server, ROOT_ID) : "/",
-          kanban: server ? kanbanUrl(server, ROOT_ID) : null,
+  const detailArea = detail ? areaOf(store, detail.id) : null;
+  const panel =
+    detail && server ? (
+      <DetailPanel
+        detail={detail}
+        fromTree={store.nodes.get(detail.id)}
+        children={knownChildren(store, detail.id).flatMap((c) => store.nodes.get(c) ?? [])}
+        areaSlot={detailArea === null ? null : (slots.get(detailArea) ?? null)}
+        timeZone={store.meta?.time_zone ?? "UTC"}
+        today={store.meta?.today ?? ""}
+        expanded={expanded.has(detail.id)}
+        onClose={() => {
+          setSelected(null);
+          setDetail(null);
         }}
-        place={
-          <label className="picker">
-            <span className="sr-only">Server</span>
-            <select
-              value={server ?? ""}
-              onChange={(e) => {
-                choose(e.target.value);
-              }}
-              disabled={!servers || servers.length === 0}
-            >
-              {(servers ?? []).map((s) => (
-                <option key={s.name} value={s.name}>
-                  {s.name}
-                  {s.status === "ok"
-                    ? s.version
-                      ? ` (${s.version})`
-                      : ""
-                    : ` (${s.status.replace("_", " ")})`}
-                </option>
-              ))}
-            </select>
-          </label>
-        }
-        actions={
-          <>
-            <label className="switch-label">
-              <input
-                type="checkbox"
-                role="switch"
-                className="switch"
-                checked={includeClosed}
-                onChange={toggleClosed}
-              />
-              Show closed
-            </label>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => void expandAll()}
-              disabled={expandingAll || tree.kind !== "ready" || !root}
-            >
-              {expandingAll ? "Expanding…" : "Expand all"}
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={collapseAll}
-              disabled={expandingAll || tree.kind !== "ready" || expanded.size <= 1}
-            >
-              Collapse all
-            </button>
-          </>
-        }
-        refresh={{
-          onClick: () => void refresh(),
-          busy: refreshing,
-          disabled: refreshing || tree.kind === "loading",
-          caption:
-            (changedAt ? `Updated ${clock(changedAt)}` : "") +
-            (checkedAt && changedAt && checkedAt.getTime() !== changedAt.getTime()
-              ? ` · checked ${clock(checkedAt)}`
-              : ""),
-        }}
+        onSelect={select}
+        onFocus={requestFocus}
+        onToggle={(id) => void toggle(id)}
+        server={server}
       />
+    ) : null;
+
+  const main = (
+    <>
+      <div className="tree-bar">
+        <span className="tree-crumb">{root?.title ?? "To do"}</span>
+        <span className="tree-bar-gap" />
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void expandAll()}
+          disabled={expandingAll || tree.kind !== "ready" || !root}
+        >
+          {expandingAll ? "Expanding…" : "Expand all"}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={collapseAll}
+          disabled={expandingAll || tree.kind !== "ready" || expanded.size <= 1}
+        >
+          Collapse all
+        </button>
+      </div>
       {(refreshError ?? expandNote ?? (store.truncated && tree.kind === "ready")) && (
         <div className={`notice ${refreshError ? "warn" : ""}`} role="status">
           {refreshError ??
@@ -565,29 +672,71 @@ export function App(): ReactElement {
             "Large tree: only the first levels are loaded. Branches load when you open them."}
         </div>
       )}
-      <main className="main">
+      <div className="main tree-main">
         {body}
         {tree.kind === "ready" && root && <Legend />}
         {current && current.status !== "ok" && tree.kind !== "error" && (
           <div className="notice warn floating">{current.message}</div>
         )}
-      </main>
-      {detail && server && (
-        <DetailPanel
-          detail={detail}
-          fromTree={store.nodes.get(detail.id)}
-          timeZone={store.meta?.time_zone ?? "UTC"}
-          today={store.meta?.today ?? ""}
-          expanded={expanded.has(detail.id)}
-          onClose={() => {
-            setSelected(null);
-            setDetail(null);
-          }}
-          onSelect={select}
-          onToggle={(id) => void toggle(id)}
-          server={server}
-        />
-      )}
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      <Shell
+        phoneTitle={root?.title ?? "To do"}
+        main={main}
+        panel={panel}
+        sidebar={{
+          view: "tree",
+          links: {
+            tree: server ? `/?server=${encodeURIComponent(server)}` : "/",
+            backlog: server ? backlogUrl(server, ROOT_ID) : "/",
+            kanban: server ? kanbanUrl(server, ROOT_ID) : null,
+          },
+          find: <FindBox nodes={() => store.nodes.values()} onJump={(id) => void jump(id)} />,
+          areas,
+          includeClosed,
+          onToggleClosed: toggleClosed,
+          nextOnly,
+          onToggleNext: toggleNextOnly,
+          serverName: server,
+          server: (
+            <label className="picker">
+              <span className="sr-only">Server</span>
+              <select
+                value={server ?? ""}
+                onChange={(e) => {
+                  choose(e.target.value);
+                }}
+                disabled={!servers || servers.length === 0}
+              >
+                {(servers ?? []).map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                    {s.status === "ok"
+                      ? s.version
+                        ? ` (${s.version})`
+                        : ""
+                      : ` (${s.status.replace("_", " ")})`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ),
+          refresh: {
+            onClick: () => void refresh(),
+            busy: refreshing,
+            disabled: refreshing || tree.kind === "loading",
+            caption:
+              (changedAt ? `Updated ${clock(changedAt)}` : "") +
+              (checkedAt && changedAt && checkedAt.getTime() !== changedAt.getTime()
+                ? ` · checked ${clock(checkedAt)}`
+                : ""),
+          },
+        }}
+      />
       {menu && menuNode && (
         <ContextMenu
           x={menu.x}
@@ -628,7 +777,7 @@ export function App(): ReactElement {
           ]}
         />
       )}
-    </div>
+    </>
   );
 }
 

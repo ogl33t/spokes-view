@@ -329,6 +329,33 @@ input[type="text"]:hover {
   overflow: hidden;
 }
 
+/* ---- tree page: a slim crumb row over the graph, which fills the rest ---- */
+.tree-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 52px;
+  padding: 0 var(--sp-5);
+  border-bottom: 1px solid var(--line);
+}
+.tree-crumb {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.tree-bar-gap {
+  flex: 1 1 auto;
+}
+.tree-main {
+  flex: 1 1 auto;
+}
+@media (max-width: 760px) {
+  /* the phone top bar carries the title; expanding happens per branch */
+  .tree-bar {
+    display: none;
+  }
+}
+
 .message {
   max-width: 34rem;
   margin: 12vh auto 0;
